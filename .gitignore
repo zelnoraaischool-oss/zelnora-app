@@ -1,0 +1,15 @@
+node_modules/
+.next/
+dist/
+out/
+coverage/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+.DS_Store
+.vercel/
+.clasp.json
+.pgtest/
+next-env.d.ts
+.pgtest/
