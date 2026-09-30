@@ -15,7 +15,7 @@ import { newId, ZnError } from "./util";
 export type ApiRequest = { action: string; params?: Record<string, unknown> };
 export type ApiResponse = { ok: true; data: unknown } | { ok: false; error: string; code: string; details?: unknown };
 
-type Handler = (ctx: Ctx, user: User, p: Record<string, any>) => unknown; // eslint-disable-line @typescript-eslint/no-explicit-any
+export type Handler = (ctx: Ctx, user: User, p: Record<string, any>) => unknown; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 function publicSettings(s: Settings, user: User) {
   const secret = !can(user, "settings.sources");
@@ -169,14 +169,14 @@ export const API_ACTIONS = Object.keys(handlers);
 
 /** 読み取り専用のアクション（Apps Script でロックを取らずに実行できる） */
 export function isReadOnly(action: string): boolean {
-  return /\.(list|get|board|matrix|summary|funnel|performance|duplicates|versions|export|csv)$/.test(action) || action === "session" || action === "dashboard" || action === "todo" || action === "months.list";
+  return /\.(list|get|board|matrix|summary|funnel|performance|duplicates|versions|export|csv|inspect)$/.test(action) || action === "session" || action === "dashboard" || action === "todo" || action === "months.list";
 }
 
 /** 認証済みのメールアドレスでAPIを実行する */
-export function handleApi(ctx: Ctx, email: string, req: ApiRequest): ApiResponse {
+export function handleApi(ctx: Ctx, email: string, req: ApiRequest, extra: Record<string, Handler> = {}): ApiResponse {
   try {
     const user = users.authenticate(ctx, email);
-    const h = handlers[req.action];
+    const h = extra[req.action] ?? handlers[req.action];
     if (!h) throw new ZnError(`不明な操作です：${req.action}`, "not_found");
     return { ok: true, data: h(ctx, user, req.params ?? {}) ?? null };
   } catch (e) {
