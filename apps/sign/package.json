@@ -14,8 +14,10 @@
     "test:db": "vitest run --project db",
     "db:test:start": "./scripts/pg-test.sh start",
     "db:test:stop": "./scripts/pg-test.sh stop",
-    "bootstrap-owner": "tsx scripts/bootstrap-owner.ts",
-    "seed": "tsx scripts/seed.ts"
+    "bootstrap-owner": "tsx --conditions=react-server scripts/bootstrap-owner.ts",
+    "seed": "tsx --conditions=react-server scripts/seed.ts",
+    "test:e2e": "playwright test",
+    "e2e:setup": "./scripts/dev-db.sh sign_e2e >/dev/null && rm -rf .data-e2e && DATABASE_URL=postgres://postgres@127.0.0.1:54329/sign_e2e AUTH_DRIVER=dev pnpm -s bootstrap-owner owner@example.com && DATABASE_URL=postgres://postgres@127.0.0.1:54329/sign_e2e pnpm -s seed"
   },
   "dependencies": {
     "@expo-google-fonts/noto-sans-jp": "^0.4.3",
@@ -23,6 +25,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "@tiptap/core": "^3.31.4",
+    "@tiptap/extension-heading": "^3.31.4",
     "@tiptap/extension-table": "^3.31.4",
     "@tiptap/pm": "^3.31.4",
     "@tiptap/react": "^3.31.4",
@@ -39,13 +42,14 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.4",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "eslint": "^10.11.0",
+    "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.7",
     "pg": "^8.23.1",
     "postcss": "^8.5.28",

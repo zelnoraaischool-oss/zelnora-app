@@ -63,7 +63,7 @@ export async function parseTimeStampResponse(
   const signed = new pkijs.SignedData({ schema: resp.timeStampToken.content });
   const eContent = signed.encapContentInfo.eContent;
   if (!eContent) throw new TsaError("TSTInfoがありません");
-  const tstInfo = pkijs.TSTInfo.fromBER(octets(eContent));
+  const tstInfo = pkijs.TSTInfo.fromBER(toArrayBuffer(octets(eContent)));
   const imprint = hex(tstInfo.messageImprint.hashedMessage.valueBlock.valueHexView);
   if (imprint !== sha256Hex) throw new TsaError("タイムスタンプのハッシュ値が要求と一致しません");
   if (tstInfo.messageImprint.hashAlgorithm.algorithmId !== OID_SHA256) throw new TsaError("ハッシュアルゴリズムが一致しません");

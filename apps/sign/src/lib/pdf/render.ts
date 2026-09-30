@@ -339,13 +339,8 @@ function renderCertificate(layout: Layout, c: CertificateData): void {
         "本PDFへのタイムスタンプ",
         "本PDF全体のSHA-256ハッシュ値に対し、外部のタイムスタンプ局によるRFC 3161タイムスタンプを取得し、システムに保存しています。",
       ),
+      ...(c.verifyUrl ? [kv("改ざんの確認", `本PDFが改ざんされていないことは次のページで確認できます：${c.verifyUrl}`)] : []),
     ],
     { size: 9, colRatios: [2, 5] },
   );
-  if (c.verifyUrl) {
-    layout.paragraph(
-      [{ text: `本PDFが改ざんされていないことは、次のページで確認できます：${c.verifyUrl}` }],
-      { size: 9, spaceAfter: 4 },
-    );
-  }
 }

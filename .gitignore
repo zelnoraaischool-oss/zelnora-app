@@ -13,3 +13,7 @@ coverage/
 .pgtest/
 next-env.d.ts
 .pgtest/
+.data/
+.data-e2e/
+test-results/
+playwright-report/

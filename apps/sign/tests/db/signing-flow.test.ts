@@ -150,7 +150,8 @@ describe("署名フロー（受け入れ基準2・3・7・8）", () => {
     expect(match.rows).toHaveLength(1);
     // 1バイトでも書き換えると一致しない
     const tampered = Buffer.from(bytes);
-    tampered[Math.floor(tampered.length / 2)] ^= 0x01;
+    const mid = Math.floor(tampered.length / 2);
+    tampered[mid] = tampered[mid]! ^ 0x01;
     const noMatch = await pg.query("select * from public.verify_document($1)", [sha256Hex(tampered)]);
     expect(noMatch.rows).toHaveLength(0);
 

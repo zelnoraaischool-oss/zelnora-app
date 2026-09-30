@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* 契約本文の表示（署名画面・プレビュー共通） */
+.contract-body {
+  @apply text-[15px] leading-8 text-slate-800;
+  word-break: break-word;
+}
+.contract-body h1 { @apply mt-6 mb-3 text-center text-lg font-bold; }
+.contract-body h2 { @apply mt-6 mb-2 text-base font-bold; }
+.contract-body h3 { @apply mt-4 mb-1 font-bold; }
+.contract-body p { @apply my-2; }
+.contract-body ul { @apply my-2 list-disc pl-6; }
+.contract-body ol { @apply my-2 list-decimal pl-6; }
+.contract-body blockquote { @apply my-2 border-l-4 border-slate-200 pl-3 text-slate-600; }
+.contract-body table { @apply my-3 w-full border-collapse text-sm; }
+.contract-body th, .contract-body td { @apply border border-slate-300 px-2 py-1 align-top; }
+.contract-body th { @apply bg-slate-100 font-semibold; }
+.contract-body hr { @apply my-4 border-slate-200; }
+.contract-body .var { @apply rounded bg-sky-50 px-0.5 font-medium text-sky-800; }
+.contract-body .missing { @apply rounded bg-rose-50 px-0.5 text-rose-700; }
+
+/* エディタ */
+.tiptap { @apply min-h-[420px] outline-none; }
+.tiptap [data-numbered="true"]::before { content: "第" counter(article) "条　"; counter-increment: article; }
+.tiptap { counter-reset: article; }
+.tiptap .variable-chip {
+  @apply mx-0.5 inline-block rounded bg-sky-100 px-1 text-sm font-medium text-sky-800 ring-1 ring-sky-300;
+}
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none float-left h-0 text-slate-400;
+}
+.tiptap .selectedCell { @apply bg-sky-50; }

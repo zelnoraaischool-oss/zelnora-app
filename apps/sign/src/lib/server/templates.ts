@@ -191,13 +191,21 @@ export async function saveDraft(
     } else {
       await tx.query("update public.templates set updated_at = now() where id = $1", [templateId]);
     }
-    await audit(tx, {
-      actorType: "admin",
-      actorId: actor.id,
-      eventType: "template.draft_saved",
-      payload: { template_id: templateId, version_no: v.version_no },
-      client,
-    });
+    // 自動保存のたびに記録するとログが埋もれるため、同じ版の保存は10分に1回まとめて記録する
+    const recent = await tx.one(
+      `select 1 from public.audit_events where event_type = 'template.draft_saved' and actor_id = $1
+         and payload->>'version_id' = $2 and created_at > now() - interval '10 minutes' limit 1`,
+      [actor.id, v.id],
+    );
+    if (!recent) {
+      await audit(tx, {
+        actorType: "admin",
+        actorId: actor.id,
+        eventType: "template.draft_saved",
+        payload: { template_id: templateId, version_id: v.id, version_no: v.version_no },
+        client,
+      });
+    }
     return v;
   });
 }

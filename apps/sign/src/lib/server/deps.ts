@@ -37,7 +37,7 @@ function secret(name: string): string {
 }
 
 function buildDeps(): Deps {
-  const dataDir = path.resolve(env("LOCAL_DATA_DIR") ?? ".data");
+  const dataDir = path.resolve(/*turbopackIgnore: true*/ env("LOCAL_DATA_DIR") ?? ".data");
   const supabaseUrl = env("NEXT_PUBLIC_SUPABASE_URL");
   const serviceKey = env("SUPABASE_SERVICE_ROLE_KEY");
   const storage: DocumentStorage =
