@@ -53,6 +53,7 @@ const handlers: Record<string, Handler> = {
 
   // 営業
   "deals.createLead": (ctx, user, p) => deals.createLead(ctx, user, p.lead),
+  "deals.importCsv": (ctx, user, p) => deals.importLeadsCsv(ctx, user, { productId: String(p.productId), rows: p.rows ?? [], source: String(p.source ?? "CSV"), dryRun: p.dryRun !== false, skipExisting: p.skipExisting !== false }),
   "deals.board": (ctx, user, p) => deals.salesBoard(ctx, user, { productId: String(p.productId), owner: p.owner, includeClosed: p.includeClosed }),
   "deals.list": (ctx, user, p) => deals.listDeals(ctx, user, p.filter ?? {}),
   "deals.move": (ctx, user, p) => deals.moveStage(ctx, user, String(p.id), p.move),

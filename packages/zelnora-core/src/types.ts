@@ -379,8 +379,10 @@ export interface ImportLog {
 
 export interface FormMapping {
   id: string; // フォームID
+  /** 登録フォーム（契約後）か、問い合わせフォーム（リードの登録）か */
+  purpose?: "registration" | "lead";
   productId: string;
-  planId: string;
+  planId: string; // 問い合わせフォームでは空でもよい
   name: string;
   responseSpreadsheetId: string;
   responseSheetName: string;

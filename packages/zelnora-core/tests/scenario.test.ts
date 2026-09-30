@@ -317,3 +317,37 @@ describe("毎日の自動処理と次のアクション", () => {
     expect(env.notifier.sent.some((n) => n.kind === "month.closing" && n.to.includes("acc@example.com"))).toBe(true);
   });
 });
+
+describe("リードの登録経路（ZN-SALES-08）：問い合わせフォームとCSV", () => {
+  it("問い合わせフォームの回答からリードを登録し、流入経路を記録する", async () => {
+    const env = setup();
+    const { ctx, owner, product } = env;
+    const { saveForm: sf } = await import("../src");
+    sf(ctx, owner, { ...env.form, id: "inquiry", purpose: "lead", planId: "", name: "無料相談の申込", mapping: { a: "customer.name", b: "customer.email" } });
+    const r = importWithLog(ctx, { formId: "inquiry", responseId: "i1", submittedAt: "", answers: { a: "問合 花子", b: "toi@example.com" } })!;
+    expect(r.status).toBe("ok");
+    const d = ctx.store.get<Deal>("deals", r.dealId!)!;
+    expect(d).toMatchObject({ productId: product.id, stageId: "lead", source: "フォーム：無料相談の申込" });
+    expect(d.nextAction?.title).toBe("初回連絡");
+    expect(ctx.store.all<Delivery>("deliveries")).toHaveLength(0);
+  });
+
+  it("CSVは取り込み前にプレビューと重複の確認をし、既存の人はとばせる", async () => {
+    const env = setup();
+    const { ctx, sales1, product } = env;
+    const { importLeadsCsv } = await import("../src");
+    createLead(ctx, sales1, { customer: { name: "既存 一郎", email: "exists@example.com" }, productId: product.id });
+    const rows = [
+      { name: "新規 太郎", email: "new1@example.com", source: "展示会" },
+      { name: "既存 一郎", email: "EXISTS@example.com" },
+      { name: "", email: "bad" },
+    ];
+    const preview = importLeadsCsv(ctx, sales1, { productId: product.id, rows, source: "CSV", dryRun: true, skipExisting: true });
+    expect(preview.preview.map((p) => [!!p.existing, p.error])).toEqual([[false, null], [true, null], [false, "氏名がありません"]]);
+    expect(ctx.store.all<Deal>("deals")).toHaveLength(1);
+    const res = importLeadsCsv(ctx, sales1, { productId: product.id, rows, source: "CSV", dryRun: false, skipExisting: true });
+    expect(res).toMatchObject({ imported: 1, skipped: 2 });
+    const d = ctx.store.all<Deal>("deals").find((x) => x.source === "展示会")!;
+    expect(d.owner).toBe("sales1@example.com");
+  });
+});

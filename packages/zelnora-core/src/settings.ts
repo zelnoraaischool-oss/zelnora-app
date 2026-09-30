@@ -98,7 +98,9 @@ export function validateSettings(s: Settings): string[] {
     if (pl.duration.value <= 0) problems.push(`プラン「${pl.name}」の期間が不正です`);
   }
   for (const f of s.forms) {
-    if (!s.plans.some((p) => p.id === f.planId)) problems.push(`フォーム「${f.name}」のプランがありません`);
+    if (f.purpose === "lead") {
+      if (!s.products.some((p) => p.id === f.productId)) problems.push(`フォーム「${f.name}」の商材がありません`);
+    } else if (!s.plans.some((p) => p.id === f.planId)) problems.push(`フォーム「${f.name}」のプランがありません`);
   }
   return problems;
 }
@@ -310,7 +312,7 @@ export function saveForm(ctx: Ctx, actor: User, form: FormMapping): Settings {
       const i = s.forms.findIndex((f) => f.id === form.id);
       if (i >= 0) s.forms[i] = form;
       else s.forms.push(form);
-      const plan = s.plans.find((p) => p.id === form.planId);
+      const plan = form.purpose === "lead" ? undefined : s.plans.find((p) => p.id === form.planId);
       if (plan) plan.formId = form.id;
     },
     `フォーム「${form.name}」の対応付けを保存`,

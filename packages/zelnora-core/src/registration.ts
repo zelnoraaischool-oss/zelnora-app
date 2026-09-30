@@ -1,7 +1,7 @@
 import { audit, type Ctx } from "./context";
 import { newCustomer, recordActivity } from "./customers";
 import { nowIso } from "./dates";
-import { notifyRegistered } from "./deals";
+import { createLeadFromSource, notifyRegistered } from "./deals";
 import { createDelivery } from "./deliveries";
 import { matchCustomer } from "./dedupe";
 import { label } from "./dictionary";
@@ -28,6 +28,40 @@ export interface ImportResult {
   customer: Customer | null;
   delivery: Delivery | null;
   dealId: string | null;
+}
+
+/** 問い合わせフォームからリードを登録する（ZN-SALES-08） */
+function importLead(ctx: Ctx, form: FormMapping, payload: FormResponsePayload): ImportResult {
+  const product = getProduct(ctx, form.productId);
+  const mapped = mapAnswers(form, payload.answers);
+  if (!mapped.customer.name) throw new ZnError("氏名に対応する質問がありません（フォームの対応付けを確認してください）", "mapping");
+  const dup = ctx.store.all<Registration>("registrations").find((r) => r.formId === form.id && r.responseId === payload.responseId);
+  if (dup) return { status: "ok", message: "取り込み済みの回答です", registration: dup, customer: null, delivery: null, dealId: null };
+  const r = createLeadFromSource(ctx, {
+    customer: { ...mapped.customer, name: mapped.customer.name, custom: mapped.custom },
+    productId: product.id,
+    planId: form.planId || null,
+    source: `フォーム：${form.name}`,
+    fields: mapped.deal,
+    matchBy: form.matchBy,
+  });
+  const now = nowIso(ctx.clock);
+  const reg: Registration = {
+    id: newId("rg", ctx.clock),
+    customerId: r.customer.id,
+    productId: product.id,
+    planId: form.planId,
+    formId: form.id,
+    responseId: payload.responseId,
+    answers: payload.answers,
+    questions: payload.questions ?? {},
+    status: "ok",
+    message: r.created ? `${label("lead", product)}として登録しました` : `既存の${label("customer", product)}に商談を追加しました`,
+    receivedAt: payload.submittedAt || now,
+    createdAt: now,
+  };
+  ctx.store.put("registrations", reg);
+  return { status: "ok", message: reg.message, registration: reg, customer: r.customer, delivery: null, dealId: r.deal.id };
 }
 
 /** 回答を、フォームの対応付け（質問ID→項目）で顧客・提供の項目に変換する */
@@ -62,6 +96,7 @@ export function importFormResponse(ctx: Ctx, payload: FormResponsePayload, opts:
   const settings = getSettings(ctx);
   const form = settings.forms.find((f) => f.id === payload.formId && f.active);
   if (!form) throw new ZnError(`対応付けのないフォームです（${payload.formId}）`, "no_mapping");
+  if (form.purpose === "lead") return importLead(ctx, form, payload);
   const product = getProduct(ctx, form.productId);
   const plan = getPlan(ctx, form.planId);
   const mapped = mapAnswers(form, payload.answers);

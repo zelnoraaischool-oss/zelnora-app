@@ -103,6 +103,102 @@ export function createLead(ctx: Ctx, user: User, input: LeadInput): { customer: 
   return { customer, deal };
 }
 
+/**
+ * 権限の確認なしでリードを登録する（問い合わせフォーム・CSVの取り込み用）。
+ * 同じ人（メール・電話）がいれば、その顧客に商談を追加する。
+ */
+export function createLeadFromSource(
+  ctx: Ctx,
+  input: { customer: CustomerInput; productId: string; planId?: string | null; source: string; owner?: string | null; fields?: Record<string, string>; matchBy?: ("email" | "phone")[]; by?: string },
+): { customer: Customer; deal: Deal; created: boolean } {
+  const product = getProduct(ctx, input.productId);
+  const stage = firstStageOfKind(product, "new") ?? [...product.stages].sort((a, b) => a.order - b.order)[0]!;
+  const found = matchCustomer(ctx.store.all<Customer>("customers"), input.customer, input.matchBy ?? ["email"]);
+  const now = nowIso(ctx.clock);
+  let customer: Customer;
+  let created = false;
+  if (found[0]) customer = found[0];
+  else {
+    customer = newCustomer(ctx, { ...input.customer, source: input.customer.source || input.source });
+    ctx.store.put("customers", customer);
+    created = true;
+  }
+  const owner = pickSalesOwner(ctx, product, input.owner ?? null);
+  const plan = input.planId ? getPlan(ctx, input.planId) : null;
+  const deal: Deal = {
+    id: newId("dl", ctx.clock),
+    customerId: customer.id,
+    productId: product.id,
+    planId: plan?.id ?? null,
+    stageId: stage.id,
+    owner,
+    amount: plan ? priceAt(plan, today(ctx.clock)).incl : null,
+    paymentMethod: null,
+    fields: input.fields ?? {},
+    nextAction: defaultNextAction(ctx, stage, {}),
+    stageEnteredAt: now,
+    history: [{ stageId: stage.id, at: now, by: input.by ?? "system" }],
+    status: "open",
+    source: input.source,
+    closedAt: null,
+    createdAt: now,
+    updatedAt: now,
+    version: 1,
+  };
+  ctx.store.put("deals", deal);
+  if (!customer.salesOwner && owner) {
+    customer = { ...customer, salesOwner: owner, updatedAt: now, version: customer.version + 1 };
+    ctx.store.put("customers", customer);
+  }
+  recordActivity(ctx, input.by ?? "system", { customerId: customer.id, dealId: deal.id, type: "stage", result: `${label("lead", product)}として登録（${input.source}）` });
+  if (owner) ctx.notifier.send({ kind: "deal.assigned", to: [owner], title: `新しい${label("lead", product)}：${customer.name}`, body: `流入経路：${input.source}`, productId: product.id });
+  return { customer, deal, created };
+}
+
+export interface CsvLeadRow {
+  name: string;
+  kana?: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  source?: string;
+  note?: string;
+}
+
+/** CSVからのリードの取り込み（ZN-SALES-08）。dryRun で重複の確認とプレビューだけ行う */
+export function importLeadsCsv(ctx: Ctx, user: User, input: { productId: string; rows: CsvLeadRow[]; source: string; dryRun: boolean; skipExisting: boolean }) {
+  if (!can(user, "deals.edit")) throw new ZnError("商談を登録する権限がありません", "forbidden");
+  if (!productAllowed(user, input.productId)) throw new ZnError("担当外の商材です", "forbidden");
+  const customers = ctx.store.all<Customer>("customers");
+  const preview = input.rows.map((r, i) => {
+    const name = (r.name ?? "").trim();
+    const existing = matchCustomer(customers, { email: r.email, phone: r.phone }, ["email", "phone"])[0] ?? null;
+    const error = !name ? "氏名がありません" : r.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email.trim()) ? "メールの形式が正しくありません" : null;
+    return { row: i + 1, name, email: r.email ?? "", existing: existing ? { id: existing.id, name: existing.name } : null, error };
+  });
+  if (input.dryRun) return { preview, imported: 0, skipped: 0 };
+  let imported = 0;
+  let skipped = 0;
+  input.rows.forEach((r, i) => {
+    const p = preview[i]!;
+    if (p.error || (p.existing && input.skipExisting)) {
+      skipped++;
+      return;
+    }
+    createLeadFromSource(ctx, {
+      customer: { name: p.name, kana: r.kana, email: r.email, phone: r.phone, company: r.company, note: r.note, source: r.source || input.source },
+      productId: input.productId,
+      source: r.source || input.source,
+      owner: user.role === "sales" ? user.email : null,
+      matchBy: ["email", "phone"],
+      by: user.email,
+    });
+    imported++;
+  });
+  audit(ctx, user, "deal.import_csv", "deals", input.productId, { imported, skipped });
+  return { preview, imported, skipped };
+}
+
 export function getDeal(ctx: Ctx, id: string): Deal {
   const d = ctx.store.get<Deal>("deals", id);
   if (!d) throw new ZnError("商談が見つかりません", "not_found");

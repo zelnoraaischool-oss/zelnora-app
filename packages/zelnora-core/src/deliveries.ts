@@ -166,7 +166,19 @@ export function progressMatrix(ctx: Ctx, user: User, opts: { productId: string; 
       })(),
     };
   });
-  // 列は、代表的な並び（最初に出た順）。繰り返し項目は回数順
+  // 列の並び：テンプレートの項目順 → 同じ項目（繰り返し）の中は回数順
+  const itemOrder = new Map<string, number>();
+  product.progressTemplates.forEach((t, ti) => t.items.forEach((it, ii) => itemOrder.set(it.id, ti * 1000 + ii)));
+  const firstSeq = new Map<string, number>();
+  for (const i of allItems) if (deliveries.some((d) => d.id === i.deliveryId)) {
+    const k = colKey(i);
+    firstSeq.set(k, Math.min(firstSeq.get(k) ?? Infinity, i.seq));
+  }
+  columns.sort((a, b) => {
+    const ta = itemOrder.get(a.key.split("#")[0]!) ?? 999999;
+    const tb = itemOrder.get(b.key.split("#")[0]!) ?? 999999;
+    return ta - tb || (firstSeq.get(a.key) ?? 0) - (firstSeq.get(b.key) ?? 0);
+  });
   return { product: { id: product.id, name: product.name, labels: product.dictionary }, columns, rows };
 }
 
