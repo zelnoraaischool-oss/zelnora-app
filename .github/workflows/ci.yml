@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 汎用性の検査（コードに商材固有の語を書かない：要件2.6）
+        run: node scripts/check-generic.mjs
+      - name: 型チェック
+        run: pnpm -r typecheck
+      - name: Lint（電子契約）
+        run: pnpm --filter @zelnora/sign lint
+      - name: テスト（単体・DB・結合）
+        run: pnpm -r test
+      - name: ビルド
+        run: |
+          pnpm --filter @zelnora/gas build
+          pnpm --filter @zelnora/web build
+          DATABASE_URL=postgres://x@127.0.0.1:1/x pnpm --filter @zelnora/sign build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @zelnora/sign exec playwright install --with-deps chromium
+      - name: E2E（Zelnora デモモード）
+        run: pnpm --filter @zelnora/web test:e2e
+      - name: E2E（電子契約）
+        env:
+          PGURL: postgres://postgres:postgres@localhost:5432
+        run: |
+          cd apps/sign
+          psql "$PGURL/postgres" -c "create database sign_e2e"
+          psql "$PGURL/sign_e2e" -v ON_ERROR_STOP=1 -q -f supabase/tests/supabase_shim.sql
+          for f in supabase/migrations/*.sql; do psql "$PGURL/sign_e2e" -v ON_ERROR_STOP=1 -q -f "$f"; done
+          DATABASE_URL=$PGURL/sign_e2e AUTH_DRIVER=dev pnpm bootstrap-owner owner@example.com
+          DATABASE_URL=$PGURL/sign_e2e pnpm seed
+          E2E_DATABASE_URL=$PGURL/sign_e2e pnpm test:e2e

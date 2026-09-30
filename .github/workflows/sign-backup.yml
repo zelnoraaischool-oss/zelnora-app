@@ -1,0 +1,26 @@
+# 電子契約のDBを週1回エクスポートし、Supabaseとは別の保存先（GitHub Actions のアーティファクト）に残す（要件4.9）。
+# 長期保管が必要な場合は、ここから別のクラウドストレージへ転送してください。
+name: sign-backup
+
+on:
+  schedule:
+    - cron: "30 18 * * 0" # 毎週月曜 3:30（日本時間）
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: pg_dump
+        env:
+          DATABASE_URL: ${{ secrets.SIGN_BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "未設定のためスキップ"; exit 0; fi
+          sudo apt-get install -y postgresql-client >/dev/null
+          pg_dump "$DATABASE_URL" --no-owner --format=custom --file sign-$(date +%Y%m%d).dump
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sign-db-backup
+          path: "*.dump"
+          retention-days: 90
+          if-no-files-found: ignore

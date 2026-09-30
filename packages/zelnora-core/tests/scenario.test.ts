@@ -195,6 +195,12 @@ describe("権限（4章）", () => {
     expect(board.columns.flatMap((c) => c.cards)).toHaveLength(1);
     const other = listCustomers(ctx, env.owner).find((c) => c.name === "二の客")!;
     expect(() => customerDetail(ctx, env.sales1, other.id)).toThrow(/権限/);
+    // 営業担当は、他の営業担当の顧客の提供も見えない
+    const d2 = ctx.store.all<Deal>("deals").find((d) => d.customerId === other.id)!;
+    moveStage(ctx, env.owner, d2.id, { stageId: "contract", planId: env.plan.id, paymentMethod: "振込", fields: { contactMethod: "電話", meetingAt: "2026-10-01" } });
+    moveStage(ctx, env.owner, d2.id, { stageId: "registered" });
+    expect(progressMatrix(ctx, env.sales1, { productId: product.id, owner: "all" }).rows).toHaveLength(0);
+    expect(progressMatrix(ctx, env.sales2, { productId: product.id, owner: "all" }).rows).toHaveLength(1);
     expect(() => listRevenues(ctx, env.viewer)).toThrow(/権限/);
     // 担当外の商材は見えない
     const other2 = productFromTemplate(ctx, "oneoff", "Web制作");

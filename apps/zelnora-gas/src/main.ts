@@ -151,6 +151,8 @@ export function doPost(e: GoogleAppsScript.Events.DoPost) {
   const run = (): ApiResponse => {
     const rt = runtime();
     const res = handleApi(rt.ctx, email, { action: body.action, params: body.params }, gasHandlers);
+    // 読み取り専用の操作でも、ログイン時の自動登録（許可ドメイン）などの書き込みは保存する
+    if (isReadOnly(body.action)) rt.store.flush();
     if (res.ok && !isReadOnly(body.action)) {
       finish(rt);
       if (SUMMARY_TRIGGERS.test(body.action)) {

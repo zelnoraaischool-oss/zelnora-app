@@ -14,9 +14,21 @@ export function visibleDeals(ctx: Ctx, user: User, deals = ctx.store.all<Deal>("
   return deals.filter((d) => productAllowed(user, d.productId) && (own !== "sales" || d.owner === user.email));
 }
 
+/** 利用者が見られる提供：提供担当は自分の担当、営業担当は自分の商談の顧客の提供（閲覧のみ） */
 export function visibleDeliveries(ctx: Ctx, user: User, deliveries = ctx.store.all<Delivery>("deliveries")): Delivery[] {
   const own = ownRowsOnly(user);
-  return deliveries.filter((d) => productAllowed(user, d.productId) && (own !== "delivery" || d.owner === user.email) && (own !== "sales" || true));
+  let salesCustomers: Set<string> | null = null;
+  if (own === "sales") {
+    salesCustomers = new Set();
+    for (const d of ctx.store.all<Deal>("deals")) if (d.owner === user.email) salesCustomers.add(d.customerId);
+    for (const c of ctx.store.all<Customer>("customers")) if (c.salesOwner === user.email) salesCustomers.add(c.id);
+  }
+  return deliveries.filter(
+    (d) =>
+      productAllowed(user, d.productId) &&
+      (own !== "delivery" || d.owner === user.email) &&
+      (salesCustomers === null || salesCustomers.has(d.customerId)),
+  );
 }
 
 /** 顧客の可視範囲：営業担当は自分の商談の顧客、提供担当は自分の提供の顧客、他は担当商材の顧客 */
