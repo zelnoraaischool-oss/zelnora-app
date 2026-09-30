@@ -1,0 +1,58 @@
+// 監査ログのイベント名（表示用）
+export const AUDIT_LABELS: Record<string, string> = {
+  "contract.created": "契約を作成",
+  "contract.sent": "送付",
+  "contract.viewed": "URLを開いた",
+  "contract.canceled": "取消",
+  "contract.signed": "署名",
+  "contract.expired": "期限切れ",
+  "token.issued": "署名URLを発行",
+  "token.revoked": "署名URLを無効化",
+  "token.reissued": "署名URLを再発行",
+  "otp.requested": "本人確認コードを送信",
+  "otp.verified": "本人確認に成功",
+  "otp.failed": "本人確認に失敗",
+  "otp.locked": "本人確認をロック",
+  "document.read_completed": "契約書の全文を表示",
+  "document.preview_downloaded": "確認用PDFをダウンロード",
+  "values.saved": "署名者が項目を入力",
+  "consent.given": "同意",
+  "document.generated": "確定版PDFを生成",
+  "document.downloaded": "確定版PDFをダウンロード",
+  "timestamp.granted": "タイムスタンプを付与",
+  "timestamp.failed": "タイムスタンプの取得に失敗",
+  "reminder.sent": "リマインドを送信",
+  "notification.sent": "通知を送信",
+  "notification.failed": "通知の送信に失敗",
+  "admin.login": "管理者ログイン",
+  "admin.login_failed": "管理者ログイン失敗",
+  "admin.logout": "管理者ログアウト",
+  "admin.mfa_enrolled": "多要素認証を登録",
+  "admin.invited": "管理者を追加",
+  "admin.updated": "管理者を変更",
+  "template.created": "テンプレートを作成",
+  "template.draft_saved": "テンプレートの下書きを保存",
+  "template.published": "テンプレートを公開",
+  "template.duplicated": "テンプレートを複製",
+  "template.archived": "テンプレートをアーカイブ",
+  "template.restored": "テンプレートを復元",
+  "clause.created": "条項を作成",
+  "clause.updated": "条項を更新",
+  "clause.deleted": "条項を削除",
+  "contact.created": "連絡先を作成",
+  "contact.updated": "連絡先を更新",
+  "settings.updated": "設定を変更",
+  "audit.verified": "ログの整合性チェック",
+  "audit.daily_digest": "日次ハッシュを送信",
+  "data.anonymized": "個人情報を匿名化",
+};
+
+export function auditLabel(type: string): string {
+  return AUDIT_LABELS[type] ?? type;
+}
+
+export const CHANNEL_LABELS: Record<string, string> = {
+  url: "URLをコピー",
+  email: "メール",
+  line: "LINE",
+};
