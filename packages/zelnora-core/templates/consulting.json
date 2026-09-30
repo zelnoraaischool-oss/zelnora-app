@@ -1,0 +1,182 @@
+{
+  "templateType": "consulting",
+  "label": "コンサル型",
+  "description": "ヒアリング→提案→契約→キックオフ→月次の定例→最終報告",
+  "dictionary": {
+    "customer": "クライアント",
+    "lead": "見込み客",
+    "delivery": "支援",
+    "deliveryOwner": "コンサルタント",
+    "progressItem": "定例"
+  },
+  "stages": [
+    {
+      "id": "lead",
+      "name": "リード",
+      "kind": "new",
+      "order": 1,
+      "requiredFields": [],
+      "defaultNextAction": {
+        "title": "初回連絡",
+        "days": 1
+      },
+      "staleDays": 5,
+      "probability": 5
+    },
+    {
+      "id": "hearing",
+      "name": "ヒアリング",
+      "kind": "meeting",
+      "order": 2,
+      "requiredFields": [
+        "meetingAt"
+      ],
+      "defaultNextAction": {
+        "title": "ヒアリングを行う",
+        "days": 0,
+        "fromField": "meetingAt"
+      },
+      "staleDays": 14,
+      "probability": 25
+    },
+    {
+      "id": "proposal",
+      "name": "提案",
+      "kind": "contact",
+      "order": 3,
+      "requiredFields": [],
+      "defaultNextAction": {
+        "title": "提案書を送る",
+        "days": 5
+      },
+      "staleDays": 14,
+      "probability": 45
+    },
+    {
+      "id": "contract",
+      "name": "契約手続き",
+      "kind": "contract",
+      "order": 4,
+      "requiredFields": [
+        "planId",
+        "amount",
+        "paymentMethod"
+      ],
+      "defaultNextAction": {
+        "title": "締結を確認する",
+        "days": 5
+      },
+      "staleDays": 10,
+      "probability": 75
+    },
+    {
+      "id": "won",
+      "name": "受注",
+      "kind": "won",
+      "order": 5,
+      "requiredFields": [],
+      "defaultNextAction": {
+        "title": "キックオフの情報を受け取る",
+        "days": 5
+      },
+      "staleDays": 10,
+      "probability": 95
+    },
+    {
+      "id": "kickoff",
+      "name": "キックオフ",
+      "kind": "registered",
+      "order": 6,
+      "requiredFields": [],
+      "defaultNextAction": null,
+      "staleDays": null,
+      "probability": 100
+    },
+    {
+      "id": "lost",
+      "name": "失注",
+      "kind": "lost",
+      "order": 90,
+      "requiredFields": [
+        "lostReason"
+      ],
+      "defaultNextAction": null,
+      "staleDays": null,
+      "probability": 0
+    }
+  ],
+  "progressTemplates": [
+    {
+      "id": "monthly",
+      "name": "月次の定例",
+      "items": [
+        {
+          "id": "kickoff",
+          "name": "キックオフ",
+          "anchor": "start",
+          "offsetDays": 0,
+          "repeat": "none",
+          "completion": "session"
+        },
+        {
+          "id": "monthly",
+          "name": "月次定例（1回目）",
+          "repeatName": "月次定例（{n}回目）",
+          "anchor": "previous",
+          "offsetDays": 30,
+          "repeat": "monthly",
+          "completion": "session",
+          "repeatStartNumber": 1
+        },
+        {
+          "id": "report",
+          "name": "最終報告",
+          "anchor": "end",
+          "offsetDays": 0,
+          "repeat": "none",
+          "completion": "check"
+        }
+      ]
+    }
+  ],
+  "customFields": {
+    "customer": [
+      {
+        "key": "industry",
+        "label": "業種",
+        "type": "text"
+      }
+    ],
+    "deal": [
+      {
+        "key": "meetingAt",
+        "label": "ヒアリング日時",
+        "type": "datetime"
+      },
+      {
+        "key": "lostReason",
+        "label": "失注理由",
+        "type": "select",
+        "options": [
+          "予算",
+          "時期",
+          "競合",
+          "その他"
+        ]
+      }
+    ],
+    "delivery": []
+  },
+  "revenueRule": "monthly",
+  "revenueBasis": "delivery_start",
+  "deliveryStartBasis": "first_session",
+  "salesAssignment": "manual",
+  "deliveryAssignment": "manual",
+  "lostReasons": [
+    "予算",
+    "時期",
+    "競合",
+    "その他"
+  ],
+  "activityTemplates": []
+}

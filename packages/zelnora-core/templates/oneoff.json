@@ -1,0 +1,32 @@
+{
+  "templateType": "oneoff",
+  "label": "単発販売型",
+  "description": "見積→契約→受注→納品→検収。検収月に一括計上",
+  "dictionary": { "delivery": "納品", "deliveryOwner": "制作担当" },
+  "stages": [
+    { "id": "lead", "name": "リード", "kind": "new", "order": 1, "requiredFields": [], "defaultNextAction": { "title": "初回連絡", "days": 1 }, "staleDays": 5, "probability": 5 },
+    { "id": "quote", "name": "見積", "kind": "contact", "order": 2, "requiredFields": [], "defaultNextAction": { "title": "見積書を送る", "days": 3 }, "staleDays": 14, "probability": 40 },
+    { "id": "contract", "name": "契約手続き", "kind": "contract", "order": 3, "requiredFields": ["planId", "amount", "paymentMethod"], "defaultNextAction": { "title": "締結を確認する", "days": 5 }, "staleDays": 10, "probability": 80 },
+    { "id": "won", "name": "受注", "kind": "won", "order": 4, "requiredFields": [], "defaultNextAction": { "title": "制作を開始する", "days": 2 }, "staleDays": 10, "probability": 95 },
+    { "id": "production", "name": "制作開始", "kind": "registered", "order": 5, "requiredFields": [], "defaultNextAction": null, "staleDays": null, "probability": 100 },
+    { "id": "lost", "name": "失注", "kind": "lost", "order": 90, "requiredFields": ["lostReason"], "defaultNextAction": null, "staleDays": null, "probability": 0 }
+  ],
+  "progressTemplates": [
+    {
+      "id": "delivery",
+      "name": "納品",
+      "items": [
+        { "id": "deliver", "name": "納品", "anchor": "end", "offsetDays": -7, "repeat": "none", "completion": "check" },
+        { "id": "accept", "name": "検収", "anchor": "end", "offsetDays": 0, "repeat": "none", "completion": "date" }
+      ]
+    }
+  ],
+  "customFields": { "customer": [], "deal": [{ "key": "lostReason", "label": "失注理由", "type": "text" }], "delivery": [] },
+  "revenueRule": "lump",
+  "revenueBasis": "contract",
+  "deliveryStartBasis": "registration",
+  "salesAssignment": "manual",
+  "deliveryAssignment": "manual",
+  "lostReasons": ["価格", "時期", "その他"],
+  "activityTemplates": []
+}

@@ -1,0 +1,33 @@
+{
+  "templateType": "subscription",
+  "label": "サブスク型",
+  "description": "無料体験→契約→利用開始→定着の確認→更新の案内。毎月計上し、解約で停止",
+  "dictionary": { "customer": "会員", "lead": "見込み会員", "delivery": "利用", "deliveryOwner": "サポート担当" },
+  "stages": [
+    { "id": "lead", "name": "リード", "kind": "new", "order": 1, "requiredFields": [], "defaultNextAction": { "title": "初回連絡", "days": 1 }, "staleDays": 3, "probability": 5 },
+    { "id": "trial", "name": "無料体験", "kind": "meeting", "order": 2, "requiredFields": ["meetingAt"], "defaultNextAction": { "title": "体験後のフォロー", "days": 7 }, "staleDays": 14, "probability": 40 },
+    { "id": "contract", "name": "契約手続き", "kind": "contract", "order": 3, "requiredFields": ["planId", "amount", "paymentMethod"], "defaultNextAction": { "title": "締結を確認する", "days": 3 }, "staleDays": 7, "probability": 80 },
+    { "id": "won", "name": "契約", "kind": "won", "order": 4, "requiredFields": [], "defaultNextAction": { "title": "利用登録を確認する", "days": 3 }, "staleDays": 7, "probability": 95 },
+    { "id": "start", "name": "利用開始", "kind": "registered", "order": 5, "requiredFields": [], "defaultNextAction": null, "staleDays": null, "probability": 100 },
+    { "id": "lost", "name": "失注", "kind": "lost", "order": 90, "requiredFields": ["lostReason"], "defaultNextAction": null, "staleDays": null, "probability": 0 }
+  ],
+  "progressTemplates": [
+    {
+      "id": "onboarding",
+      "name": "定着支援",
+      "items": [
+        { "id": "start", "name": "利用開始", "anchor": "start", "offsetDays": 0, "repeat": "none", "completion": "check" },
+        { "id": "check", "name": "定着の確認", "anchor": "start", "offsetDays": 30, "repeat": "none", "completion": "session" },
+        { "id": "renewal", "name": "更新の案内", "anchor": "end", "offsetDays": -14, "repeat": "none", "completion": "check" }
+      ]
+    }
+  ],
+  "customFields": { "customer": [], "deal": [{ "key": "meetingAt", "label": "体験日", "type": "datetime" }, { "key": "lostReason", "label": "失注理由", "type": "text" }], "delivery": [] },
+  "revenueRule": "monthly",
+  "revenueBasis": "delivery_start",
+  "deliveryStartBasis": "registration",
+  "salesAssignment": "round_robin",
+  "deliveryAssignment": "least_loaded",
+  "lostReasons": ["価格", "機能", "その他"],
+  "activityTemplates": []
+}

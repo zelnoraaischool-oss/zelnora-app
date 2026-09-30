@@ -1,0 +1,243 @@
+{
+  "templateType": "school",
+  "label": "スクール型",
+  "description": "申込→面談→契約→受講者登録→毎週の受講→修了。例：AIエンジニアスクール（AES）",
+  "dictionary": {
+    "customer": "受講者",
+    "lead": "受講予定者",
+    "deal": "商談",
+    "delivery": "受講",
+    "deliveryOwner": "コンサル",
+    "salesOwner": "営業",
+    "progressItem": "受講",
+    "registration": "受講者登録"
+  },
+  "stages": [
+    {
+      "id": "lead",
+      "name": "リード",
+      "kind": "new",
+      "order": 1,
+      "requiredFields": [],
+      "defaultNextAction": {
+        "title": "初回連絡",
+        "days": 1
+      },
+      "staleDays": 3,
+      "probability": 5
+    },
+    {
+      "id": "appo",
+      "name": "アポ",
+      "kind": "contact",
+      "order": 2,
+      "requiredFields": [
+        "contactMethod"
+      ],
+      "defaultNextAction": {
+        "title": "無料面談の日程を確定する",
+        "days": 2
+      },
+      "staleDays": 7,
+      "probability": 15
+    },
+    {
+      "id": "meeting",
+      "name": "無料面談",
+      "kind": "meeting",
+      "order": 3,
+      "requiredFields": [
+        "meetingAt"
+      ],
+      "defaultNextAction": {
+        "title": "面談を行う",
+        "days": 0,
+        "fromField": "meetingAt"
+      },
+      "staleDays": 14,
+      "probability": 35
+    },
+    {
+      "id": "contract",
+      "name": "クラウド契約",
+      "kind": "contract",
+      "order": 4,
+      "requiredFields": [
+        "planId",
+        "amount",
+        "paymentMethod"
+      ],
+      "defaultNextAction": {
+        "title": "締結を確認する",
+        "days": 3
+      },
+      "staleDays": 7,
+      "probability": 70
+    },
+    {
+      "id": "won",
+      "name": "締結",
+      "kind": "won",
+      "order": 5,
+      "requiredFields": [],
+      "defaultNextAction": {
+        "title": "受講者登録フォームの提出を確認する",
+        "days": 3
+      },
+      "staleDays": 7,
+      "probability": 95
+    },
+    {
+      "id": "registered",
+      "name": "受講者登録",
+      "kind": "registered",
+      "order": 6,
+      "requiredFields": [],
+      "defaultNextAction": null,
+      "staleDays": null,
+      "probability": 100
+    },
+    {
+      "id": "lost",
+      "name": "失注",
+      "kind": "lost",
+      "order": 90,
+      "requiredFields": [
+        "lostReason"
+      ],
+      "defaultNextAction": null,
+      "staleDays": null,
+      "probability": 0
+    },
+    {
+      "id": "hold",
+      "name": "保留",
+      "kind": "hold",
+      "order": 91,
+      "requiredFields": [
+        "resumeDate"
+      ],
+      "defaultNextAction": {
+        "title": "再開の連絡",
+        "days": 0,
+        "fromField": "resumeDate"
+      },
+      "staleDays": null,
+      "probability": 10
+    }
+  ],
+  "progressTemplates": [
+    {
+      "id": "weekly",
+      "name": "毎週の受講",
+      "items": [
+        {
+          "id": "setup",
+          "name": "初回受講設定",
+          "anchor": "start",
+          "offsetDays": 2,
+          "repeat": "none",
+          "completion": "date"
+        },
+        {
+          "id": "first",
+          "name": "初回受講",
+          "anchor": "previous",
+          "offsetDays": 0,
+          "repeat": "none",
+          "completion": "session"
+        },
+        {
+          "id": "weekly",
+          "name": "2週目",
+          "repeatName": "{n}週目",
+          "anchor": "previous",
+          "offsetDays": 7,
+          "repeat": "weekly",
+          "completion": "session",
+          "repeatStartNumber": 2
+        },
+        {
+          "id": "finish",
+          "name": "修了",
+          "anchor": "end",
+          "offsetDays": 0,
+          "repeat": "none",
+          "completion": "check"
+        }
+      ]
+    }
+  ],
+  "customFields": {
+    "customer": [
+      {
+        "key": "purpose",
+        "label": "受講の目的",
+        "type": "textarea"
+      },
+      {
+        "key": "job",
+        "label": "現在の職種",
+        "type": "text"
+      }
+    ],
+    "deal": [
+      {
+        "key": "contactMethod",
+        "label": "連絡手段",
+        "type": "select",
+        "options": [
+          "電話",
+          "メール",
+          "LINE",
+          "SNS"
+        ]
+      },
+      {
+        "key": "meetingAt",
+        "label": "面談日時",
+        "type": "datetime"
+      },
+      {
+        "key": "lostReason",
+        "label": "失注理由",
+        "type": "select",
+        "options": [
+          "価格",
+          "時期",
+          "競合",
+          "連絡不通",
+          "その他"
+        ]
+      },
+      {
+        "key": "resumeDate",
+        "label": "再開予定日",
+        "type": "date"
+      }
+    ],
+    "delivery": []
+  },
+  "revenueRule": "lump",
+  "revenueBasis": "contract",
+  "deliveryStartBasis": "registration",
+  "salesAssignment": "manual",
+  "deliveryAssignment": "least_loaded",
+  "lostReasons": [
+    "価格",
+    "時期",
+    "競合",
+    "連絡不通",
+    "その他"
+  ],
+  "activityTemplates": [
+    {
+      "title": "面談のお礼",
+      "body": "本日はお時間をいただきありがとうございました。"
+    },
+    {
+      "title": "不在",
+      "body": "電話したが不在。折り返し待ち。"
+    }
+  ]
+}

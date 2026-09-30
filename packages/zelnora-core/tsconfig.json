@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "lib": ["ES2020"], "types": ["node"], "resolveJsonModule": true },
+  "include": ["src", "tests", "templates"]
+}
