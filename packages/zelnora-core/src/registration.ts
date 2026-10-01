@@ -78,6 +78,11 @@ export function mapAnswers(form: FormMapping, answers: Record<string, string>) {
     else if (target.startsWith("delivery.fields.")) delivery[target.slice(16)] = v;
     else if (target.startsWith("deal.fields.")) deal[target.slice(12)] = v;
   }
+  // 姓と名・セイとメイが別の質問のフォーム：「姓 名」の形にまとめる
+  const join = (a?: string, b?: string) => [a, b].map((x) => x?.trim()).filter(Boolean).join(" ");
+  if (!customer.name && (customer.lastName || customer.firstName)) customer.name = join(customer.lastName, customer.firstName);
+  if (!customer.kana && (customer.lastKana || customer.firstKana)) customer.kana = join(customer.lastKana, customer.firstKana);
+  for (const k of ["lastName", "firstName", "lastKana", "firstKana"]) delete customer[k];
   return { customer, custom, delivery, deal };
 }
 
