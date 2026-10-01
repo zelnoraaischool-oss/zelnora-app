@@ -2,6 +2,7 @@ import { can } from "@zelnora/core";
 import { useState } from "react";
 import { LinkButton, PageHeader, Tabs } from "../../components/ui";
 import { useSession } from "../../lib/session";
+import { EsignSettingsPage } from "./esign";
 import { FormsSettings } from "./forms";
 import { GeneralSettings, VersionsSettings } from "./general";
 import { PlansSettings } from "./plans";
@@ -9,7 +10,7 @@ import { ProductsSettings } from "./products";
 import { SourcesSettings } from "./sources";
 import { UsersSettings } from "./users";
 
-type Tab = "products" | "plans" | "forms" | "sources" | "users" | "general" | "versions";
+type Tab = "products" | "plans" | "forms" | "esign" | "sources" | "users" | "general" | "versions";
 
 export function SettingsPage() {
   const s = useSession();
@@ -17,6 +18,7 @@ export function SettingsPage() {
     { id: "products", label: s.labels().product, show: can(s.user, "settings.products") },
     { id: "plans", label: s.labels().plan, show: can(s.user, "settings.products") },
     { id: "forms", label: "フォームの対応付け", show: can(s.user, "settings.sources") },
+    { id: "esign", label: "電子契約", show: can(s.user, "settings.sources") },
     { id: "sources", label: "データソース登録簿", show: can(s.user, "settings.sources") },
     { id: "users", label: "利用者とロール", show: can(s.user, "users.manage") },
     { id: "general", label: "基本設定", show: can(s.user, "settings.products") },
@@ -35,6 +37,7 @@ export function SettingsPage() {
       {tab === "products" && <ProductsSettings />}
       {tab === "plans" && <PlansSettings />}
       {tab === "forms" && <FormsSettings />}
+      {tab === "esign" && <EsignSettingsPage />}
       {tab === "sources" && <SourcesSettings />}
       {tab === "users" && <UsersSettings />}
       {tab === "general" && <GeneralSettings />}

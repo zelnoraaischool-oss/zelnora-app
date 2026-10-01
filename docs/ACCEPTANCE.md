@@ -16,6 +16,14 @@
 
 そのほか：OTPのロック・有効期限・再送制限、TSA障害時の再試行キュー、自動リマインド、匿名化、日次ハッシュ、RFC 3161 の応答の検証（`tests/unit/tsa.test.ts`）。
 
+### 追加の機能（DECISIONS 1-27〜1-29）
+
+| 内容 | 確認している自動テスト |
+|---|---|
+| 既存の契約書（PDF）を格納し、締結済みとして検索・照合できる。格納後は変更・削除できない（DB所有者でも）。二重格納・PDF以外は拒否 | `tests/db/integration.test.ts`、`tests/e2e/import.spec.ts` |
+| 連携API：APIキー、externalRef での二重作成の防止、署名完了の通知（HMAC署名・署名URLを含めない）、通知失敗時の再送、anon は通知キューを読めない | `tests/db/integration.test.ts` |
+| Wordの契約書（.docx）から本文（表題・第N条・変数・表）を作る。許可していない要素は捨てる | `tests/unit/docx-import.test.ts`、`tests/e2e/import.spec.ts` |
+
 ## Zelnora app（Must 要件の主なもの）
 
 | 要件 | 内容 | 確認している自動テスト |
@@ -28,4 +36,5 @@
 | ZN-SALES-04/05/08 | 移動の条件・次のアクション・リード登録（手入力・CSV・問い合わせフォーム） | `scenario.test.ts`、`demo.spec.ts` |
 | 8.1 / ZN-DLV-* | 進捗テンプレート・受講の記録・休止・修了/解約 | `pure.test.ts`、`scenario.test.ts`、`demo.spec.ts` |
 | 9.1 / ZN-REV-* | 計上ルール・税と端数・価格改定・返金・月次締め・集計・書き出し | `pure.test.ts`、`scenario.test.ts`、`bundle.test.ts`（月次売上タブの書き出し） |
+| 12章（2-17） | 電子契約との連携：契約の段階で契約書を作成・送付、署名完了（通知・定期確認）で成約、取消・期限切れの通知、失敗時も段階の移動は止めない、通知のHMAC検証・古い通知の拒否 | `packages/zelnora-core/tests/esign.test.ts`、`apps/zelnora-gas/tests/bundle.test.ts`、`apps/zelnora-web/tests/demo.spec.ts` |
 | 2.4 / ZN-SET-10/11/12 | データソース登録簿・見出しの変更検知・設定の版管理 | `apps/zelnora-gas/tests/sheets-store.test.ts`、`scenario.test.ts` |

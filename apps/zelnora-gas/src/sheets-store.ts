@@ -29,7 +29,7 @@ type Kind = "json" | "num" | "bool";
 export const SCHEMA: Record<EntityName, Record<string, Kind>> = {
   users: { productIds: "json", active: "bool", capacity: "num" },
   customers: { tags: "json", custom: "json", version: "num" },
-  deals: { amount: "num", fields: "json", nextAction: "json", history: "json", version: "num" },
+  deals: { amount: "num", fields: "json", nextAction: "json", history: "json", esign: "json", version: "num" },
   contracts: { amountIncl: "num" },
   registrations: { answers: "json", questions: "json" },
   deliveries: { nextAction: "json", pauses: "json", satisfaction: "json", fields: "json", version: "num" },

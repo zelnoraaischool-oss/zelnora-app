@@ -11,7 +11,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!actor) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
   const d = deps();
-  const doc = await d.db.one<DocumentRow>("select * from public.documents where contract_id = $1 and kind = 'final'", [id]);
+  const doc = await d.db.one<DocumentRow>("select * from public.documents where contract_id = $1 order by created_at limit 1", [id]);
   const contract = await d.db.one<ContractRow>("select * from public.contracts where id = $1", [id]);
   if (!doc || !contract) return new Response("Not found", { status: 404 });
   const bytes = await d.storage.read(doc.storage_path);

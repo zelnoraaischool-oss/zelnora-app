@@ -13,6 +13,8 @@ export * from "./users";
 export * from "./scope";
 export * from "./customers";
 export * from "./deals";
+export * from "./esign";
+export * from "./esign-memory";
 export * from "./deliveries";
 export * from "./revenues";
 export * from "./registration";

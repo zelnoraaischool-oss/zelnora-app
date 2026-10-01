@@ -25,6 +25,7 @@ import { formatJstDate } from "../format";
 import { renderContractPdf, type CertificateEvent } from "../pdf/render";
 import { audit, type ClientInfo, maskEmail } from "./audit";
 import type { Deps } from "./deps";
+import { notifyIntegrationSafely } from "./integration";
 import { adminCompletedMessage, completedMessage, otpMessage, sendEmail } from "./notify";
 import { getSettings } from "./settings";
 import {
@@ -571,7 +572,7 @@ export async function finalizeSignature(
       contractId: s.contract.id,
       templateName: version.template_name,
       templateVersion: version.version_no,
-      templateBodyHash: s.contract.template_body_hash,
+      templateBodyHash: s.contract.template_body_hash ?? "",
       organizationName: settings.organization_name,
       signerName: s.party.name,
       signerEmail: verifiedEmail,
@@ -634,6 +635,7 @@ export async function finalizeSignature(
   });
 
   const timestamped = await stampDocument(d, { id: documentId, contract_id: s.contract.id, sha256 });
+  await notifyIntegrationSafely(d, s.contract.id, "contract.signed");
 
   // 署名者と管理者へ確定版PDFを送付
   const attachment = { filename: `${s.contract.title}.pdf`.replace(/[\\/:*?"<>|]/g, "_"), content: pdf, contentType: "application/pdf" };

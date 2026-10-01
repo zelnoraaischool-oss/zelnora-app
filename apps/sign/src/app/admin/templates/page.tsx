@@ -30,6 +30,10 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
               <Input name="name" placeholder="テンプレート名（例：業務委託契約書）" required />
               <Button type="submit">作成</Button>
             </form>
+            <p className="mt-2 text-xs text-slate-500">
+              お手元のWordの契約書（.docx）は、作成後の「本文」タブの「Wordの契約書から読み込む」で取り込めます。
+              締結済みの契約書（PDF）の保管は「既存の契約書を格納」から。
+            </p>
           </Card>
           {!hasCourse && (
             <Card title="初期テンプレート">

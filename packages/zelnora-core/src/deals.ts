@@ -6,6 +6,7 @@ import { matchCustomer } from "./dedupe";
 import { label } from "./dictionary";
 import { can, productAllowed } from "./permissions";
 import { priceAt } from "./revenue";
+import { autoRequestEsign } from "./esign";
 import { createRevenueForContract } from "./revenues";
 import { visibleDeals } from "./scope";
 import { firstStageOfKind, getPlan, getProduct, getSettings, stageById } from "./settings";
@@ -205,7 +206,7 @@ export function getDeal(ctx: Ctx, id: string): Deal {
   return d;
 }
 
-function requireEditable(ctx: Ctx, user: User, deal: Deal) {
+export function requireEditable(ctx: Ctx, user: User, deal: Deal) {
   if (!can(user, "deals.edit") || !productAllowed(user, deal.productId)) throw new ZnError("この商談を編集する権限がありません", "forbidden");
   if (user.role === "sales" && deal.owner !== user.email) throw new ZnError("自分の担当の商談のみ編集できます", "forbidden");
 }
@@ -235,10 +236,15 @@ export interface MoveInput {
   note?: string;
   /** 成約時の締結日（既定は今日） */
   signedAt?: string;
+  /** 成約時：外部の契約システムの契約ID */
+  externalContractId?: string | null;
 }
 
 export interface MoveResult {
   deal: Deal;
+  /** 電子契約の署名URL（契約の段階で自動作成した場合） */
+  esignUrl?: string | null;
+  esignError?: string;
   contract?: Contract;
   delivery?: Delivery;
   registrationUrl?: string | null;
@@ -310,16 +316,24 @@ export function moveStage(ctx: Ctx, user: User, dealId: string, input: MoveInput
         recordActivity(ctx, user.email, { customerId: deal.customerId, dealId, type: "meeting", result: "面談の予定", note: `日時：${next.fields.meetingAt}` });
       }
       break;
-    case "contract":
-      // 契約システムとの連携（12章）は後日。連携前は作成依頼を記録する
-      recordActivity(ctx, user.email, { customerId: deal.customerId, dealId, type: "contract", result: "契約の作成依頼", note: `${next.amount?.toLocaleString("ja-JP") ?? ""}円・${next.paymentMethod ?? ""}` });
+    case "contract": {
+      // 電子契約の連携（12章）：設定があれば契約書を作成して送る。なければ作成依頼を記録する
+      const auto = autoRequestEsign(ctx, user, next);
+      if (auto.requested) {
+        result.deal = auto.deal ?? result.deal;
+        result.esignUrl = auto.url ?? null;
+        if (auto.error) result.esignError = auto.error;
+      } else {
+        recordActivity(ctx, user.email, { customerId: deal.customerId, dealId, type: "contract", result: "契約の作成依頼", note: `${next.amount?.toLocaleString("ja-JP") ?? ""}円・${next.paymentMethod ?? ""}` });
+      }
       break;
+    }
     case "won":
-      Object.assign(result, recordWon(ctx, user, next, customer, input.signedAt));
+      Object.assign(result, recordWon(ctx, user, next, customer, input.signedAt, input.externalContractId));
       break;
     case "registered":
       if (!ctx.store.all<Delivery>("deliveries").some((d) => d.dealId === dealId && d.status !== "canceled")) {
-        if (!ctx.store.all<Contract>("contracts").some((c) => c.dealId === dealId)) Object.assign(result, recordWon(ctx, user, next, customer, input.signedAt));
+        if (!ctx.store.all<Contract>("contracts").some((c) => c.dealId === dealId)) Object.assign(result, recordWon(ctx, user, next, customer, input.signedAt, input.externalContractId));
         result.delivery = createDelivery(ctx, user.email, { customerId: deal.customerId, productId: deal.productId, planId: next.planId!, dealId });
         notifyRegistered(ctx, product, next, customer, result.delivery);
       }
@@ -334,7 +348,7 @@ export function moveStage(ctx: Ctx, user: User, dealId: string, input: MoveInput
 }
 
 /** 成約の処理（ZN-SALES-10）：契約・売上予定・登録フォームの案内 */
-function recordWon(ctx: Ctx, user: User, deal: Deal, customer: Customer, signedAt?: string): Omit<MoveResult, "deal"> {
+function recordWon(ctx: Ctx, user: User, deal: Deal, customer: Customer, signedAt?: string, externalId?: string | null): Omit<MoveResult, "deal"> {
   const existing = ctx.store.all<Contract>("contracts").find((c) => c.dealId === deal.id && c.status === "signed");
   if (existing) return { contract: existing };
   if (!deal.planId || !deal.amount || !deal.paymentMethod) {
@@ -356,7 +370,7 @@ function recordWon(ctx: Ctx, user: User, deal: Deal, customer: Customer, signedA
     paymentMethod: deal.paymentMethod,
     signedAt: signedAt && isDate(signedAt) ? signedAt : today(ctx.clock),
     status: "signed",
-    externalId: null,
+    externalId: externalId ?? deal.esign?.contractId ?? null,
     createdAt: nowIso(ctx.clock),
   };
   ctx.store.put("contracts", contract);

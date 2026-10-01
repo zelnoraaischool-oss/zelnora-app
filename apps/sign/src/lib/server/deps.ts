@@ -14,6 +14,13 @@ export interface Deps {
   now: () => Date;
   secrets: { session: string; otp: string; tokenEncryption: string };
   appUrl: string;
+  /** 外部システム（顧客管理）との連携。未設定なら連携APIは無効 */
+  integration: {
+    apiKey?: string;
+    webhookUrl?: string;
+    webhookSecret?: string;
+    fetch: typeof fetch;
+  };
 }
 
 let current: Deps | null = null;
@@ -80,6 +87,12 @@ function buildDeps(): Deps {
       tokenEncryption: secret("TOKEN_ENCRYPTION_KEY"),
     },
     appUrl: (env("APP_URL") ?? "http://localhost:3000").replace(/\/$/, ""),
+    integration: {
+      apiKey: env("INTEGRATION_API_KEY"),
+      webhookUrl: env("INTEGRATION_WEBHOOK_URL"),
+      webhookSecret: env("INTEGRATION_WEBHOOK_SECRET"),
+      fetch: (...args) => fetch(...args),
+    },
   };
 }
 

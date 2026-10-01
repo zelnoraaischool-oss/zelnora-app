@@ -2,6 +2,7 @@ import { can, type Deal, type FieldDef, type Product, type Stage } from "@zelnor
 import { useMemo, useState } from "react";
 import { ApiError, call } from "../lib/api";
 import { useSession } from "../lib/session";
+import { EsignBadge, EsignPanel } from "./esign-panel";
 import { UserSelect } from "./pickers";
 import { Alert, Badge, Button, Field, Input, Modal, Select, Textarea, yen } from "./ui";
 
@@ -46,7 +47,9 @@ function FieldInput({ product, def, value, onChange }: { product: Product; def: 
 }
 
 /** 段階の移動（必須項目が足りなければその場で入力：ZN-SALES-03/04） */
-export function MoveStageDialog({ deal, product, target, onClose, onDone }: { deal: Deal; product: Product; target?: Stage; onClose: () => void; onDone: (r: { registrationUrl?: string | null }) => void }) {
+type MoveDone = { registrationUrl?: string | null; esignUrl?: string | null; esignError?: string };
+
+export function MoveStageDialog({ deal, product, target, onClose, onDone }: { deal: Deal; product: Product; target?: Stage; onClose: () => void; onDone: (r: MoveDone) => void }) {
   const s = useSession();
   const priceOf = (planId: string) => s.settings.plans.find((p) => p.id === planId)?.priceIncl ?? 0;
   const stages = useMemo(() => [...product.stages].sort((a, b) => a.order - b.order), [product]);
@@ -63,6 +66,7 @@ export function MoveStageDialog({ deal, product, target, onClose, onDone }: { de
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [esignResult, setEsignResult] = useState<MoveDone | null>(null);
   const needsAction = ["new", "contact", "meeting", "contract", "hold"].includes(stage.kind);
   const required = stage.requiredFields;
   const submit = async () => {
@@ -71,7 +75,7 @@ export function MoveStageDialog({ deal, product, target, onClose, onDone }: { de
     try {
       const fields: Record<string, string> = {};
       for (const [k, v] of Object.entries(values)) if (!["planId", "amount", "paymentMethod"].includes(k) && v !== undefined) fields[k] = v;
-      const r = await call<{ registrationUrl?: string | null }>("deals.move", {
+      const r = await call<MoveDone>("deals.move", {
         id: deal.id,
         move: {
           stageId,
@@ -83,13 +87,36 @@ export function MoveStageDialog({ deal, product, target, onClose, onDone }: { de
           note,
         },
       });
-      onDone(r);
+      // 電子契約を作成した（または失敗した）ときは、結果を見せてから閉じる
+      if (r.esignUrl || r.esignError) setEsignResult(r);
+      else onDone(r);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+  if (esignResult) {
+    return (
+      <Modal open title="電子契約" onClose={() => onDone(esignResult)} footer={<Button onClick={() => onDone(esignResult)}>閉じる</Button>}>
+        {esignResult.esignError ? (
+          <Alert tone="error">
+            「{stage.name}」に移しましたが、電子契約を作成できませんでした：{esignResult.esignError}
+            {"\n"}商談の画面の「電子契約を送る」からやり直してください。
+          </Alert>
+        ) : (
+          <Alert tone="success">
+            「{stage.name}」に移し、契約書を作成しました{(s.settings.esign?.sendEmail ?? true) ? "（顧客にメールでも送りました）" : ""}。
+            {"\n"}署名URL：
+            <button type="button" className="ml-1 break-all underline" onClick={() => void navigator.clipboard?.writeText(esignResult.esignUrl ?? "")}>
+              {esignResult.esignUrl}（コピー）
+            </button>
+            {"\n"}署名が完了すると、自動で成約に移ります。
+          </Alert>
+        )}
+      </Modal>
+    );
+  }
   return (
     <Modal
       open
@@ -161,11 +188,13 @@ export function DealDialog({ deal, onClose, onChanged }: { deal: Deal; onClose: 
   const [amount, setAmount] = useState(deal.amount ? String(deal.amount) : "");
   const [msg, setMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [url, setUrl] = useState<string | null>(null);
-  const stage = product.stages.find((x) => x.id === deal.stageId);
+  const [current, setCurrent] = useState<Deal>(deal);
+  const [dirty, setDirty] = useState(false);
+  const stage = product.stages.find((x) => x.id === current.stageId);
   const canEdit = can(s.user, "deals.edit") && (s.user.role !== "sales" || deal.owner === s.user.email);
   const save = async () => {
     try {
-      await call("deals.update", { id: deal.id, version: deal.version, patch: { fields, amount: amount ? Number(amount) : null, ...(owner !== (deal.owner ?? "") ? { owner: owner || null } : {}) } });
+      await call("deals.update", { id: deal.id, version: current.version, patch: { fields, amount: amount ? Number(amount) : null, ...(owner !== (deal.owner ?? "") ? { owner: owner || null } : {}) } });
       setMsg({ tone: "success", text: "保存しました" });
       onChanged();
     } catch (e) {
@@ -178,7 +207,7 @@ export function DealDialog({ deal, onClose, onChanged }: { deal: Deal; onClose: 
         open={!moving}
         wide
         title={`${s.labels(product.id).deal}：${product.name}`}
-        onClose={onClose}
+        onClose={dirty ? onChanged : onClose}
         footer={
           canEdit ? (
             <>
@@ -200,7 +229,8 @@ export function DealDialog({ deal, onClose, onChanged }: { deal: Deal; onClose: 
           </Alert>
         )}
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Badge tone={deal.status === "won" ? "green" : deal.status === "lost" ? "red" : "blue"}>{stage?.name}</Badge>
+          <Badge tone={current.status === "won" ? "green" : current.status === "lost" ? "red" : "blue"}>{stage?.name}</Badge>
+          <EsignBadge esign={current.esign} />
           {deal.nextAction && (
             <span>
               次：{deal.nextAction.title}（{deal.nextAction.due}）
@@ -212,11 +242,19 @@ export function DealDialog({ deal, onClose, onChanged }: { deal: Deal; onClose: 
             .filter((x) => x.kind !== "lost" && x.kind !== "hold")
             .sort((a, b) => a.order - b.order)
             .map((x) => (
-              <li key={x.id} className={`rounded px-2 py-1 ${x.order <= (stage?.order ?? 0) && deal.status !== "lost" ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+              <li key={x.id} className={`rounded px-2 py-1 ${x.order <= (stage?.order ?? 0) && current.status !== "lost" ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"}`}>
                 {x.name}
               </li>
             ))}
         </ol>
+        <EsignPanel
+          deal={current}
+          canEdit={canEdit}
+          onChanged={(d) => {
+            setCurrent(d);
+            setDirty(true);
+          }}
+        />
         <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-2">
           <Field label="担当営業">
             <UserSelect value={owner} onChange={setOwner} roles={["sales", "manager", "admin", "owner"]} allowEmpty />

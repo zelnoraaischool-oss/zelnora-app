@@ -6,6 +6,7 @@ import { ContractBody } from "@/components/contract-body";
 import { type ClauseOption, RichEditor } from "@/components/editor/rich-editor";
 import { Alert, Badge, Button, Card, cx, Field, Input, Select, Textarea } from "@/components/ui";
 import {
+  documentToPlainText,
   collectVariableKeys,
   CONFIRM_ITEMS,
   type ConfirmItemKey,
@@ -17,6 +18,7 @@ import {
 import { formatValue, isValidVariableKey, sampleValue, SYSTEM_VARIABLES, VARIABLE_TYPES, type VariableDef, type VariableType } from "@/lib/contract/variables";
 import { formatJst } from "@/lib/format";
 import type { TemplateRow, TemplateVersionRow } from "@/lib/server/types";
+import { WordImport } from "./word-import";
 import { archiveTemplateAction, duplicateTemplateAction, publishAction, saveDraftAction, startNewVersionAction } from "../../actions";
 
 type Tab = "body" | "variables" | "confirm" | "key" | "email" | "search" | "history";
@@ -70,6 +72,7 @@ export function TemplateEditor({
   const [saveState, setSaveState] = useState<{ saving: boolean; savedAt?: string; error?: string }>({ saving: false });
   const [publishMsg, setPublishMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
+  const [editorKey, setEditorKey] = useState(0);
   const dirty = useRef(false);
 
   const payload = useMemo(
@@ -214,8 +217,29 @@ export function TemplateEditor({
         ))}
       </div>
 
+      {tab === "body" && editable && (
+        <WordImport
+          hasContent={documentToPlainText(body).trim() !== ""}
+          onImported={(r) => {
+            setBody(r.doc);
+            setEditorKey((k) => k + 1);
+            const known = new Set<string>([...variables.map((v) => v.key), ...SYSTEM_VARIABLES]);
+            const added = r.variableKeys.filter((k) => !known.has(k) && isValidVariableKey(k));
+            if (added.length) {
+              setVariables((vs) => [...vs, ...added.map((key): VariableDef => ({ key, type: "text", filledBy: "admin", required: true }))]);
+            }
+            if (r.title && !name.trim()) setName(r.title);
+            return [
+              `読み込みました（条 ${r.articleCount} 件）。`,
+              added.length ? `変数を ${added.length} 件追加しました：${added.join("、")}（「変数」タブで種類と入力者を確認してください）。` : "",
+              "表や書式の崩れがないか、プレビューで確認してください。",
+              ...r.warnings,
+            ].filter(Boolean).join("\n");
+          }}
+        />
+      )}
       {tab === "body" && (
-        <BodyTab title={name} body={body} setBody={setBody} variables={variables} variableKeys={variableKeys} clauses={clauses} editable={editable} />
+        <BodyTab key={editorKey} title={name} body={body} setBody={setBody} variables={variables} variableKeys={variableKeys} clauses={clauses} editable={editable} />
       )}
       {tab === "variables" && <VariablesTab variables={variables} setVariables={setVariables} usedKeys={usedKeys} editable={editable} />}
       {tab === "confirm" && (

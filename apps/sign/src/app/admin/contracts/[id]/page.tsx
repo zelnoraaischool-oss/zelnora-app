@@ -22,7 +22,9 @@ function detailText(type: string, p: Record<string, unknown>): string {
   if (type === "values.saved") return Object.entries((p.values as Record<string, string>) ?? {}).map(([k, v]) => `${k}：${v}`).join(" / ");
   if (type === "consent.given") return String(p.summary ?? "");
   if (type === "contract.signed") return `署名：${String(p.signed_name ?? "")}${p.handwritten_signature ? "（手書きサインあり）" : ""}`;
-  if (type === "document.generated") return `SHA-256：${String(p.sha256 ?? "")}`;
+  if (type === "document.generated" || type === "document.stored") return `SHA-256：${String(p.sha256 ?? "")}`;
+  if (type === "contract.imported") return `相手方：${String(p.counterparty ?? "")}・締結日：${String(p.signed_date ?? "")}・${String(p.filename ?? "")}`;
+  if (type === "integration.notified") return `イベント：${String(p.event ?? "")}`;
   if (type === "timestamp.granted") return `時刻：${formatJst(String(p.tsa_time), { seconds: true })}`;
   if (type === "timestamp.failed") return String(p.error ?? "");
   if (type === "notification.sent" || type === "notification.failed") return `${String(p.type)} → ${String(p.to ?? "")}${p.error ? `（${String(p.error)}）` : ""}`;
@@ -39,7 +41,8 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
   });
   const { contract, party, version, values, documents, timestamps, events, notifications, token, costYen } = detail;
   const status = contract.effective_status ?? contract.status;
-  const defs = new Map(version.variables.map((v) => [v.key, v]));
+  const defs = new Map((version?.variables ?? []).map((v) => [v.key, v]));
+  const imported = contract.source === "imported";
   const pdfTs = timestamps.find((t) => t.target === "pdf");
   const contentTs = timestamps.find((t) => t.target === "content");
   const doc = documents[0];
@@ -56,33 +59,53 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
           <ContractActions
             contractId={contract.id}
             status={status}
-            hasEmail={!!party.email}
+            hasEmail={!!party?.email}
             tokenState={token ? { expiresAt: token.expires_at, revoked: !!token.revoked_at } : null}
             hasDocument={!!doc}
+            imported={imported}
           />
           <Card title="契約の内容">
             <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-              <div><dt className="text-xs text-slate-500">署名者</dt><dd className="font-semibold">{party.name}</dd></div>
-              <div><dt className="text-xs text-slate-500">メールアドレス</dt><dd>{party.email ?? "（未登録）"}</dd></div>
+              <div><dt className="text-xs text-slate-500">署名者</dt><dd className="font-semibold">{party?.name ?? "（未登録）"}</dd></div>
+              <div><dt className="text-xs text-slate-500">メールアドレス</dt><dd>{party?.email ?? "（未登録）"}</dd></div>
               <div><dt className="text-xs text-slate-500">取引先</dt><dd>{contract.counterparty_name}</dd></div>
               <div><dt className="text-xs text-slate-500">金額</dt><dd>{formatYen(contract.amount) || "—"}</dd></div>
               <div><dt className="text-xs text-slate-500">取引年月日</dt><dd>{contract.transaction_date ?? "—"}</dd></div>
-              <div><dt className="text-xs text-slate-500">送付方法</dt><dd>{contract.delivery_channels.map((c) => CHANNEL_LABELS[c] ?? c).join("・")}</dd></div>
-              <div><dt className="text-xs text-slate-500">作成日時</dt><dd>{formatJst(contract.created_at)}</dd></div>
-              <div><dt className="text-xs text-slate-500">有効期限</dt><dd>{formatJst(contract.expires_at)}</dd></div>
-              <div><dt className="text-xs text-slate-500">署名日時</dt><dd>{formatJst(contract.signed_at, { seconds: true }) || "—"}</dd></div>
+              {imported ? (
+                <>
+                  <div><dt className="text-xs text-slate-500">締結日</dt><dd>{contract.signed_at ? formatJst(contract.signed_at).slice(0, 10) : "—"}</dd></div>
+                  <div><dt className="text-xs text-slate-500">格納日時</dt><dd>{formatJst(contract.created_at)}</dd></div>
+                </>
+              ) : (
+                <>
+                  <div><dt className="text-xs text-slate-500">送付方法</dt><dd>{contract.delivery_channels.map((c) => CHANNEL_LABELS[c] ?? c).join("・")}</dd></div>
+                  <div><dt className="text-xs text-slate-500">作成日時</dt><dd>{formatJst(contract.created_at)}</dd></div>
+                  <div><dt className="text-xs text-slate-500">有効期限</dt><dd>{formatJst(contract.expires_at)}</dd></div>
+                  <div><dt className="text-xs text-slate-500">署名日時</dt><dd>{formatJst(contract.signed_at, { seconds: true }) || "—"}</dd></div>
+                </>
+              )}
+              {contract.external_ref && (
+                <div><dt className="text-xs text-slate-500">連携元の識別子</dt><dd className="break-all font-mono text-xs">{contract.external_ref}</dd></div>
+              )}
+              {contract.note && (
+                <div className="sm:col-span-2"><dt className="text-xs text-slate-500">メモ</dt><dd className="whitespace-pre-wrap">{contract.note}</dd></div>
+              )}
               {contract.canceled_at && (
                 <div><dt className="text-xs text-slate-500">取消</dt><dd>{formatJst(contract.canceled_at)}（{contract.cancel_reason}）</dd></div>
               )}
               <div className="sm:col-span-2">
                 <dt className="text-xs text-slate-500">テンプレート</dt>
-                <dd>
-                  <Link className="text-brand-700 hover:underline" href={`/admin/templates/${version.template_id}`}>
-                    {version.template_name}
-                  </Link>{" "}
-                  第{version.version_no}版
-                  <span className="block break-all font-mono text-xs text-slate-500">本文ハッシュ {contract.template_body_hash}</span>
-                </dd>
+                {version ? (
+                  <dd>
+                    <Link className="text-brand-700 hover:underline" href={`/admin/templates/${version.template_id}`}>
+                      {version.template_name}
+                    </Link>{" "}
+                    第{version.version_no}版
+                    <span className="block break-all font-mono text-xs text-slate-500">本文ハッシュ {contract.template_body_hash}</span>
+                  </dd>
+                ) : (
+                  <dd>なし（既存の契約書を格納）</dd>
+                )}
               </div>
             </dl>
             {values.length > 0 && (
@@ -126,9 +149,15 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
         </div>
 
         <div className="space-y-5">
-          <Card title="確定版PDF・タイムスタンプ">
+          <Card title={imported ? "原本（格納したPDF）・タイムスタンプ" : "確定版PDF・タイムスタンプ"}>
             {doc ? (
               <div className="space-y-3 text-sm">
+                {doc.filename && (
+                  <div>
+                    <div className="text-xs text-slate-500">ファイル名</div>
+                    <div className="break-all">{doc.filename}</div>
+                  </div>
+                )}
                 <div>
                   <div className="text-xs text-slate-500">SHA-256</div>
                   <div className="break-all font-mono text-xs">{doc.sha256}</div>

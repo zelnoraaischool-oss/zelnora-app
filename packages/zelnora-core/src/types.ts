@@ -199,10 +199,44 @@ export interface Deal {
   history: { stageId: string; at: string; by: string }[];
   status: "open" | "won" | "lost";
   source: string;
+  /** 電子契約システムで作成した契約書（12章） */
+  esign?: DealEsign | null;
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;
   version: number;
+}
+
+export type EsignStatus = "sent" | "viewed" | "signed" | "canceled" | "expired";
+
+export interface DealEsign {
+  contractId: string;
+  templateId: string;
+  status: EsignStatus;
+  /** 署名URL（署名待ちの間だけ保持する） */
+  url: string | null;
+  adminUrl: string | null;
+  requestedAt: string;
+  requestedBy: string;
+  signedAt: string | null;
+  sha256: string | null;
+  updatedAt: string;
+}
+
+/** 電子契約システムとの連携の設定（APIキーと通知の秘密値は設定に置かない） */
+export interface EsignSettings {
+  enabled: boolean;
+  /** 電子契約システムのURL（例 https://sign.example.jp） */
+  baseUrl: string;
+  /** 署名URLをメールでも送る */
+  sendEmail: boolean;
+  expiresInDays: number;
+  /** 契約の段階へ移したら自動で作成する */
+  autoRequest: boolean;
+  /** 署名が完了したら成約の段階へ自動で移す */
+  autoWon: boolean;
+  /** プランID → 使うテンプレートと、テンプレートの変数に入れる値（変数名 → 値の出どころ） */
+  plans: Record<string, { templateId: string; templateName?: string; values: Record<string, string> }>;
 }
 
 export interface Contract {
@@ -449,6 +483,7 @@ export interface Settings {
   allowedDomains: string[];
   notifications: { slackWebhook: string; googleChatWebhook: string; email: boolean };
   maskedFields: { field: "email" | "phone"; roles: Role[] }[];
+  esign?: EsignSettings;
   wizardDrafts: Record<string, unknown>;
   updatedAt: string;
   updatedBy: string;

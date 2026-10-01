@@ -83,8 +83,12 @@ export type ContractStatus = "draft" | "sent" | "viewed" | "signed" | "expired" 
 
 export interface ContractRow {
   id: string;
-  template_version_id: string;
-  template_body_hash: string;
+  /** 既存の契約書を格納したもの（source = imported）は null */
+  template_version_id: string | null;
+  template_body_hash: string | null;
+  source: "template" | "imported";
+  external_ref: string | null;
+  note: string | null;
   title: string;
   status: ContractStatus;
   effective_status?: ContractStatus;
@@ -142,6 +146,9 @@ export interface AccessTokenRow {
 export interface DocumentRow {
   id: string;
   contract_id: string;
+  /** final＝確定版PDF、original＝格納した既存の契約書 */
+  kind: "final" | "original";
+  filename: string | null;
   storage_path: string;
   sha256: string;
   size_bytes: number;

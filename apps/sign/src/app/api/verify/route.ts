@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   if (!/^[0-9a-f]{64}$/.test(sha)) {
     return NextResponse.json({ ok: false, error: "SHA-256のハッシュ値（64桁の16進数）を指定してください" }, { status: 400 });
   }
-  const row = await deps().db.one<{ contract_id: string; title: string; signed_at: string; tsa_time: string | null }>(
+  const row = await deps().db.one<{ contract_id: string; title: string; signed_at: string; tsa_time: string | null; kind: string }>(
     "select * from public.verify_document($1)",
     [sha],
   );
@@ -21,5 +21,6 @@ export async function POST(req: Request) {
     signedAt: row.signed_at,
     timestampAt: row.tsa_time,
     contractId: row.contract_id,
+    kind: row.kind,
   });
 }

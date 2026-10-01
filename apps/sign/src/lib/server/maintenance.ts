@@ -3,6 +3,7 @@ import { jstDateString } from "../format";
 import { audit } from "./audit";
 import { sendReminder } from "./contracts";
 import type { Deps } from "./deps";
+import { deliverPendingWebhooks, notifyIntegrationSafely } from "./integration";
 import { sendEmail } from "./notify";
 import { getSettings } from "./settings";
 import { processTimestampJobs } from "./signing";
@@ -15,6 +16,7 @@ export async function markExpired(d: Deps): Promise<number> {
   );
   for (const r of rows) {
     await audit(d.db, { contractId: r.id, actorType: "system", eventType: "contract.expired" });
+    await notifyIntegrationSafely(d, r.id, "contract.expired");
   }
   return rows.length;
 }
@@ -132,5 +134,6 @@ export async function runMaintenance(d: Deps) {
   const reminders = await sendDueReminders(d);
   const anonymized = await anonymizeStale(d);
   const digest = await sendDailyDigest(d);
-  return { timestamps, expired, reminders, anonymized, digest };
+  const webhooks = await deliverPendingWebhooks(d);
+  return { timestamps, expired, reminders, anonymized, digest, webhooks };
 }

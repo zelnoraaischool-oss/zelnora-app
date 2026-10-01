@@ -14,12 +14,14 @@ export function ContractActions({
   hasEmail,
   tokenState,
   hasDocument,
+  imported = false,
 }: {
   contractId: string;
   status: string;
   hasEmail: boolean;
   tokenState: { expiresAt: string; revoked: boolean } | null;
   hasDocument: boolean;
+  imported?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -98,7 +100,7 @@ export function ContractActions({
               className="inline-flex min-h-10 items-center rounded-lg px-4 py-2 text-sm font-semibold text-brand-700 ring-1 ring-brand-600"
               href={`/api/admin/contracts/${contractId}/pdf`}
             >
-              確定版PDFをダウンロード
+              {imported ? "原本のPDFをダウンロード" : "確定版PDFをダウンロード"}
             </a>
           )}
         </div>

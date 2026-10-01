@@ -2,6 +2,7 @@
 import {
   type ApiRequest,
   type ApiResponse,
+  applyEsignStatus,
   bootstrapOwner,
   can,
   type Ctx,
@@ -16,11 +17,13 @@ import {
   retryFailedImports,
   runDailyJobs,
   saveDataSource,
+  syncEsignStatuses,
   systemClock,
   updateSettings,
   ZnError,
 } from "@zelnora/core";
 import { verifyIdToken } from "./auth";
+import { esignGateway, type EsignWebhookBody, verifyEsignWebhook } from "./esign";
 import { ensureFormTriggers, inspectForm, payloadFromResponse, prefillUrl } from "./forms";
 import { openBook, prop, setProp } from "./gas-env";
 import { GasNotifier } from "./notifier";
@@ -46,6 +49,7 @@ function runtime(): Runtime {
     notifier,
     prefillUrl: (formId, values) => prefillUrl(getSettings(ctx).forms, formId, values),
   };
+  ctx.esign = esignGateway(() => getSettings(ctx).esign?.baseUrl ?? "");
   // 見出しの変更を検知したら、オーナーに知らせる（ZN-SET-11）
   const original = notifier.deliver.bind(notifier);
   notifier.deliver = (settings, users, appUrl) => {
@@ -128,7 +132,7 @@ const gasHandlers: Record<string, Handler> = {
   },
 };
 
-const SUMMARY_TRIGGERS = /^(revenues\.|months\.|deals\.move|deliveries\.finish|settings\.(savePlan|revisePrice|saveProduct))/;
+const SUMMARY_TRIGGERS = /^(revenues\.|months\.|deals\.(move|refreshEsign)|deliveries\.finish|settings\.(savePlan|revisePrice|saveProduct))/;
 
 function json(res: unknown) {
   return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
@@ -136,12 +140,13 @@ function json(res: unknown) {
 
 /** Web API（Cloudflare Pages の画面から text/plain の POST で呼ぶ） */
 export function doPost(e: GoogleAppsScript.Events.DoPost) {
-  let body: { idToken?: string } & ApiRequest;
+  let body: { idToken?: string; kind?: string } & ApiRequest;
   try {
     body = JSON.parse(e.postData?.contents || "{}");
   } catch {
     return json({ ok: false, error: "リクエストの形式が正しくありません", code: "bad_request" });
   }
+  if (body.kind === "esign.webhook") return esignWebhook(body as unknown as EsignWebhookBody);
   let email: string;
   try {
     email = verifyIdToken(body.idToken ?? "");
@@ -172,6 +177,36 @@ export function doPost(e: GoogleAppsScript.Events.DoPost) {
   }
 }
 
+/** 電子契約システムからの通知（署名完了・取消・期限切れ） */
+function esignWebhook(body: EsignWebhookBody) {
+  let event: ReturnType<typeof verifyEsignWebhook>;
+  try {
+    event = verifyEsignWebhook(body);
+  } catch (err) {
+    console.warn("esign webhook rejected", err instanceof Error ? err.message : err);
+    return json({ ok: false, error: "通知を受け付けられません", code: "unauthorized" });
+  }
+  try {
+    const r = withLock(() => {
+      const rt = runtime();
+      const res = applyEsignStatus(rt.ctx, event);
+      finish(rt);
+      if (res.won) {
+        try {
+          exportSummaries(rt);
+        } catch (err) {
+          console.warn("summary export failed", err);
+        }
+      }
+      return res;
+    });
+    return json({ ok: true, data: r });
+  } catch (err) {
+    // ok:false を返すと電子契約システムが後で再送する
+    return json({ ok: false, error: err instanceof Error ? err.message : String(err), code: "server_error" });
+  }
+}
+
 export function doGet() {
   return json({ ok: true, name: "Zelnora API", configured: !!prop(DB_PROP) });
 }
@@ -186,11 +221,16 @@ export function onFormSubmitTrigger(e: GoogleAppsScript.Events.FormsOnFormSubmit
   });
 }
 
-/** 15分ごとの見直し処理：失敗した取り込みの再試行 */
+/** 15分ごとの見直し処理：失敗した取り込みの再試行、署名待ちの電子契約の状態の確認 */
 export function retryImportsJob() {
   withLock(() => {
     const rt = runtime();
     retryFailedImports(rt.ctx);
+    try {
+      syncEsignStatuses(rt.ctx);
+    } catch (err) {
+      console.warn("esign sync failed", err);
+    }
     finish(rt);
   });
 }

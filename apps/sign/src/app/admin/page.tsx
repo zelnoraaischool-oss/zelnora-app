@@ -21,7 +21,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     dateTo: str(sp.dateTo),
     amountMin: str(sp.amountMin).replace(/[,円]/g, ""),
     amountMax: str(sp.amountMax).replace(/[,円]/g, ""),
-    templateId: str(sp.templateId),
+    templateId: str(sp.templateId) === "imported" ? "" : str(sp.templateId),
+    source: str(sp.templateId) === "imported" || str(sp.source) === "imported" ? "imported" : "",
     page: Number(str(sp.page)) || 1,
   };
   const [{ rows, total, page, pageSize }, { counts, timestampPending }, templates, costs] = await Promise.all([
@@ -113,8 +114,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           </label>
           <label className="text-sm">
             <span className="mb-1 block font-semibold text-slate-700">テンプレート</span>
-            <Select name="templateId" defaultValue={filters.templateId}>
+            <Select name="templateId" defaultValue={filters.source === "imported" ? "imported" : filters.templateId}>
               <option value="">すべて</option>
+              <option value="imported">既存の契約書（格納）</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -163,7 +165,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {r.template_name}
-                    <span className="text-slate-400">（第{r.version_no}版）</span>
+                    {r.version_no !== null && <span className="text-slate-400">（第{r.version_no}版）</span>}
                   </td>
                   <td className="px-3 py-2">{r.counterparty_name}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatYen(r.amount)}</td>

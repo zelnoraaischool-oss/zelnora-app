@@ -96,7 +96,7 @@ describe("検証ページ用の関数", () => {
     const { sha256 } = await signFixture(c, f.partyId);
     const r = await asRole(c, "anon", {}, () => c.query("select * from public.verify_document($1)", [sha256]));
     expect(r.rows).toHaveLength(1);
-    expect(Object.keys(r.rows[0]).sort()).toEqual(["contract_id", "created_at", "signed_at", "title", "tsa_time"]);
+    expect(Object.keys(r.rows[0]).sort()).toEqual(["contract_id", "created_at", "kind", "signed_at", "title", "tsa_time"]);
     const none = await asRole(c, "anon", {}, () =>
       c.query("select * from public.verify_document($1)", ["f".repeat(64)]),
     );

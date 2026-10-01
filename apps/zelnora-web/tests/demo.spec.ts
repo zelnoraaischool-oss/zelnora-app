@@ -111,3 +111,50 @@ test("マネージャー：CSVでリードを取り込み、既存の人はと�
   await page.getByRole("dialog").getByText("閉じる", { exact: true }).click();
   await expect(page.locator("section[aria-label='リード'] article", { hasText: "新規 花子" })).toBeVisible();
 });
+
+test("電子契約：契約の段階に移すと契約書を作成して送り、署名が完了すると締結になる", async ({ page }) => {
+  await loginAs(page, "佐藤（営業）");
+  await page.getByRole("link", { name: "営業" }).click();
+  const card = page.locator("article", { hasText: "上田 美咲" });
+  await card.getByRole("button", { name: "メニュー" }).click();
+  await card.getByRole("button", { name: "クラウド契約" }).click();
+  const move = page.getByRole("dialog", { name: "段階を変更" });
+  await move.getByLabel("プラン").selectOption({ index: 1 });
+  await move.getByLabel("支払い方法").selectOption("銀行振込");
+  await move.getByRole("button", { name: "クラウド契約 に進める" }).click();
+
+  // 契約書を作成し、署名URLを表示する
+  const result = page.getByRole("dialog", { name: "電子契約" });
+  await expect(result).toContainText("契約書を作成しました");
+  await expect(result).toContainText("https://sign.demo.example/s#");
+  await result.getByText("閉じる", { exact: true }).click();
+  const moved = page.locator("section[aria-label='クラウド契約'] article", { hasText: "上田 美咲" });
+  await expect(moved).toContainText("電子契約：署名待ち");
+
+  // 顧客の署名（デモ）→ 締結へ自動で移る
+  await moved.click();
+  const panel = page.getByRole("region", { name: "電子契約" });
+  await expect(panel.getByRole("button", { name: "署名URLをコピー" })).toBeVisible();
+  await panel.getByRole("button", { name: "（デモ）顧客が署名したことにする" }).click();
+  await expect(panel).toContainText("成約になりました");
+  await expect(panel).toContainText("電子契約：署名完了");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("section[aria-label='締結'] article", { hasText: "上田 美咲" })).toContainText("電子契約：署名完了");
+});
+
+test("電子契約：オーナーはプランごとの契約書と差し込む値を設定できる", async ({ page }) => {
+  await loginAs(page, "オーナー（デモ）");
+  await page.goto("/settings");
+  await page.getByRole("tab", { name: "電子契約" }).click();
+  await expect(page.getByLabel("電子契約システムのURL")).toHaveValue("https://sign.demo.example");
+  await page.getByRole("button", { name: "接続を確認してテンプレートを読み込む" }).click();
+  await expect(page.getByText("公開済みのテンプレートが 1 件あります")).toBeVisible();
+  const select = page.getByLabel(/月額支援 の契約書/);
+  await select.selectOption({ label: "サービス利用契約書（デモ）" });
+  await expect(page.getByLabel("月額支援・氏名")).toHaveValue("customer.name");
+  await expect(page.getByLabel("月額支援・料金")).toHaveValue("deal.amount");
+  await page.getByLabel("月額支援・プラン名").selectOption("text:");
+  await page.getByLabel("プラン名の固定の文字").last().fill("法人向け月額支援");
+  await page.getByRole("button", { name: "保存" }).last().click();
+  await expect(page.getByText("保存しました")).toBeVisible();
+});

@@ -6,6 +6,7 @@ import { upsertContact, type ContactInput } from "./contacts";
 import type { Db } from "./db";
 import type { Deps } from "./deps";
 import { inviteMessage, reminderMessage, sendEmail } from "./notify";
+import { notifyIntegrationSafely } from "./integration";
 import { getSettings } from "./settings";
 import {
   type AccessTokenRow,
@@ -35,6 +36,12 @@ export interface CreateContractInput {
   channels: DeliveryChannel[];
   expiresInDays?: number;
   title?: string;
+  /** 依頼元（外部システム）での識別子 */
+  externalRef?: string | null;
+}
+
+export function actorOf(actor: Actor | null): { actorType: "admin" | "system"; actorId: string } {
+  return actor ? { actorType: "admin", actorId: actor.id } : { actorType: "system", actorId: "integration" };
 }
 
 async function issueToken(db: Db, d: Deps, partyId: string, expiresAt: string, actorId: string | null) {
@@ -47,7 +54,9 @@ async function issueToken(db: Db, d: Deps, partyId: string, expiresAt: string, a
   return token;
 }
 
-export async function createContract(d: Deps, actor: Actor, input: CreateContractInput, client?: ClientInfo) {
+/** actor が null の場合は外部システムからの依頼（連携API）として記録する */
+export async function createContract(d: Deps, actor: Actor | null, input: CreateContractInput, client?: ClientInfo) {
+  const who = actorOf(actor);
   const settings = await getSettings(d.db);
   const channels = [...new Set(input.channels)].filter((c): c is DeliveryChannel => c === "url" || c === "email");
   if (!channels.length) channels.push("url");
@@ -86,8 +95,8 @@ export async function createContract(d: Deps, actor: Actor, input: CreateContrac
     const title = input.title?.trim() || `${template.name}（${contact.name} 様）`;
     const contract = await tx.one<ContractRow>(
       `insert into public.contracts (template_version_id, template_body_hash, title, status, amount, transaction_date,
-         counterparty_name, delivery_channels, expires_at, sent_at, created_by)
-       values ($1, $2, $3, 'sent', $4, $5, $6, $7, $8, now(), $9) returning *`,
+         counterparty_name, delivery_channels, expires_at, sent_at, created_by, external_ref)
+       values ($1, $2, $3, 'sent', $4, $5, $6, $7, $8, now(), $9, $10) returning *`,
       [
         version.id,
         version.body_hash,
@@ -97,7 +106,8 @@ export async function createContract(d: Deps, actor: Actor, input: CreateContrac
         counterparty,
         channels,
         expiresAt,
-        actor.id,
+        actor?.id ?? null,
+        input.externalRef ?? null,
       ],
     );
     const party = await tx.one<PartyRow>(
@@ -111,11 +121,10 @@ export async function createContract(d: Deps, actor: Actor, input: CreateContrac
         [contract!.id, key, value],
       );
     }
-    const token = await issueToken(tx, d, party!.id, expiresAt, actor.id);
+    const token = await issueToken(tx, d, party!.id, expiresAt, actor?.id ?? null);
     await audit(tx, {
       contractId: contract!.id,
-      actorType: "admin",
-      actorId: actor.id,
+      ...who,
       eventType: "contract.created",
       payload: {
         template_id: template.id,
@@ -125,13 +134,13 @@ export async function createContract(d: Deps, actor: Actor, input: CreateContrac
         signer: { name: contact.name, email: contact.email },
         values,
         expires_at: expiresAt,
+        ...(input.externalRef ? { external_ref: input.externalRef } : {}),
       },
       client,
     });
     await audit(tx, {
       contractId: contract!.id,
-      actorType: "admin",
-      actorId: actor.id,
+      ...who,
       eventType: "token.issued",
       payload: { expires_at: expiresAt },
       client,
@@ -145,8 +154,7 @@ export async function createContract(d: Deps, actor: Actor, input: CreateContrac
     if (ch === "url") {
       await audit(d.db, {
         contractId: result.contract.id,
-        actorType: "admin",
-        actorId: actor.id,
+        ...who,
         eventType: "contract.sent",
         payload: { channel: "url" },
         client,
@@ -171,8 +179,7 @@ export async function createContract(d: Deps, actor: Actor, input: CreateContrac
       if (ok) {
         await audit(d.db, {
           contractId: result.contract.id,
-          actorType: "admin",
-          actorId: actor.id,
+          ...who,
           eventType: "contract.sent",
           payload: { channel: "email" },
           client,
@@ -243,6 +250,7 @@ export async function cancelContract(d: Deps, actor: Actor, contractId: string, 
       });
     }
   });
+  await notifyIntegrationSafely(d, contractId, "contract.canceled");
 }
 
 export async function revokeTokens(d: Deps, actor: Actor, contractId: string, reason: string, client?: ClientInfo) {
@@ -351,6 +359,8 @@ export interface ContractSearch {
   amountMin?: string;
   amountMax?: string;
   templateId?: string;
+  /** template＝このシステムで作成、imported＝格納した既存の契約書 */
+  source?: string;
   page?: number;
   pageSize?: number;
 }
@@ -359,7 +369,7 @@ export interface ContractListItem extends ContractRow {
   signer_name: string | null;
   signer_email: string | null;
   template_name: string;
-  version_no: number;
+  version_no: number | null;
   timestamp_pending: boolean;
 }
 
@@ -371,23 +381,24 @@ export async function searchContracts(db: Db, s: ContractSearch) {
     where.push(sql.replaceAll("?", `$${params.length}`));
   };
   if (s.status) add("c.effective_status = ?", s.status);
-  if (s.q?.trim()) add("(c.title ilike ? or p.name ilike ? or p.email ilike ? or c.counterparty_name ilike ?)", `%${s.q.trim()}%`);
+  if (s.q?.trim()) add("(c.title ilike ? or p.name ilike ? or p.email ilike ? or c.counterparty_name ilike ? or c.note ilike ?)", `%${s.q.trim()}%`);
   if (s.counterparty?.trim()) add("c.counterparty_name ilike ?", `%${s.counterparty.trim()}%`);
   if (s.dateFrom) add("c.transaction_date >= ?::date", s.dateFrom);
   if (s.dateTo) add("c.transaction_date <= ?::date", s.dateTo);
   if (s.amountMin !== undefined && s.amountMin !== "") add("c.amount >= ?::numeric", s.amountMin);
   if (s.amountMax !== undefined && s.amountMax !== "") add("c.amount <= ?::numeric", s.amountMax);
   if (s.templateId) add("tv.template_id = ?", s.templateId);
+  if (s.source === "template" || s.source === "imported") add("c.source = ?", s.source);
   const pageSize = Math.min(200, Math.max(1, s.pageSize ?? 50));
   const page = Math.max(1, s.page ?? 1);
   const whereSql = where.length ? `where ${where.join(" and ")}` : "";
   const base = `from public.contracts_view c
-    join public.template_versions tv on tv.id = c.template_version_id
-    join public.templates t on t.id = tv.template_id
+    left join public.template_versions tv on tv.id = c.template_version_id
+    left join public.templates t on t.id = tv.template_id
     left join lateral (select * from public.contract_parties p where p.contract_id = c.id order by sign_order limit 1) p on true
     ${whereSql}`;
   const rows = await db.query<ContractListItem>(
-    `select c.*, p.name as signer_name, p.email as signer_email, t.name as template_name, tv.version_no,
+    `select c.*, p.name as signer_name, p.email as signer_email, coalesce(t.name, '既存の契約書（格納）') as template_name, tv.version_no,
        (c.status = 'signed' and not exists (
           select 1 from public.document_timestamps ts where ts.contract_id = c.id and ts.target = 'pdf')) as timestamp_pending
      ${base} order by c.created_at desc limit ${pageSize} offset ${(page - 1) * pageSize}`,
@@ -423,7 +434,7 @@ export async function getContractDetail(db: Db, contractId: string) {
       "select variable_key, value, entered_by from public.contract_values where contract_id = $1 order by variable_key",
       [contractId],
     ),
-    db.query<DocumentRow>("select * from public.documents where contract_id = $1", [contractId]),
+    db.query<DocumentRow>("select * from public.documents where contract_id = $1 order by created_at", [contractId]),
     db.query<TimestampRow>("select * from public.document_timestamps where contract_id = $1 order by created_at", [contractId]),
     db.query<AuditRow>("select * from public.audit_events where contract_id = $1 order by seq", [contractId]),
     db.query<NotificationRow>("select * from public.notifications where contract_id = $1 order by sent_at", [contractId]),
@@ -439,8 +450,8 @@ export async function getContractDetail(db: Db, contractId: string) {
     timestamps.length * Number(settings.cost_timestamp_yen);
   return {
     contract,
-    party: party!,
-    version: version!,
+    party,
+    version,
     values,
     documents,
     timestamps,

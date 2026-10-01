@@ -4,6 +4,7 @@ import * as customers from "./customers";
 import { dashboard, todoList } from "./dashboard";
 import * as deals from "./deals";
 import * as deliveries from "./deliveries";
+import * as esign from "./esign";
 import { can } from "./permissions";
 import * as registration from "./registration";
 import * as revenues from "./revenues";
@@ -58,6 +59,13 @@ const handlers: Record<string, Handler> = {
   "deals.list": (ctx, user, p) => deals.listDeals(ctx, user, p.filter ?? {}),
   "deals.move": (ctx, user, p) => deals.moveStage(ctx, user, String(p.id), p.move),
   "deals.update": (ctx, user, p) => deals.updateDeal(ctx, user, String(p.id), p.patch ?? {}, p.version),
+  "deals.requestEsign": (ctx, user, p) => esign.requestEsign(ctx, user, String(p.id), { sendEmail: p.sendEmail }),
+  "deals.refreshEsign": (ctx, user, p) => esign.refreshEsign(ctx, user, String(p.id)),
+
+  // 電子契約の連携（12章）
+  "esign.templates": (ctx, user) => esign.listEsignTemplates(ctx, user),
+  "esign.sources": (ctx, _user, p) => esign.esignValueSources(p.productId ? settings.getProduct(ctx, String(p.productId)) : null),
+  "esign.saveSettings": (ctx, user, p) => esign.saveEsignSettings(ctx, user, p.settings ?? {}),
   "deals.completeAction": (ctx, user, p) => deals.completeNextAction(ctx, user, String(p.id), p.next ?? null, p.note ?? ""),
   "actions.postpone": (ctx, user, p) => deals.postponeNextAction(ctx, user, { dealId: p.dealId, deliveryId: p.deliveryId }, String(p.due)),
   "deals.funnel": (ctx, user, p) => deals.funnel(ctx, user, { productId: String(p.productId), from: p.from, to: p.to, groupBy: p.groupBy ?? null }),
@@ -170,7 +178,7 @@ export const API_ACTIONS = Object.keys(handlers);
 
 /** 読み取り専用のアクション（Apps Script でロックを取らずに実行できる） */
 export function isReadOnly(action: string): boolean {
-  return /\.(list|get|board|matrix|summary|funnel|performance|duplicates|versions|export|csv|inspect)$/.test(action) || action === "session" || action === "dashboard" || action === "todo" || action === "months.list";
+  return /\.(list|get|board|matrix|summary|funnel|performance|duplicates|versions|export|csv|inspect|templates|sources)$/.test(action) || action === "session" || action === "dashboard" || action === "todo" || action === "months.list";
 }
 
 /** 認証済みのメールアドレスでAPIを実行する */

@@ -4,8 +4,8 @@ AIエンジニアスクールの業務システム一式です。
 
 | 名前 | 内容 | 構成 | 場所 |
 |---|---|---|---|
-| **電子契約システム** | 自社専用の電子契約。テンプレート管理、URL・メールでの送付、メールOTPによる本人確認、確定版PDF（合意締結証明書付き）、RFC 3161 タイムスタンプ、ハッシュチェーンの監査ログ、検証ページ | Next.js（App Router）＋ Supabase ＋ Vercel ＋ Resend | [`apps/sign`](apps/sign) |
-| **Zelnora app** | 顧客・営業・提供・売上をひとつの画面で管理。スプレッドシートを正本にし、固定費0円で運用 | Google スプレッドシート ＋ Apps Script（API）＋ Cloudflare Pages（画面） | [`packages/zelnora-core`](packages/zelnora-core)（業務ロジック）<br>[`apps/zelnora-gas`](apps/zelnora-gas)（API）<br>[`apps/zelnora-web`](apps/zelnora-web)（画面） |
+| **電子契約システム** | 自社専用の電子契約。テンプレート管理（Wordの契約書から読み込み可）、URL・メールでの送付、メールOTPによる本人確認、確定版PDF（合意締結証明書付き）、RFC 3161 タイムスタンプ、ハッシュチェーンの監査ログ、検証ページ、既存の契約書（PDF）の格納、Zelnora との連携API | Next.js（App Router）＋ Supabase ＋ Vercel ＋ Resend | [`apps/sign`](apps/sign) |
+| **Zelnora app** | 顧客・営業・提供・売上をひとつの画面で管理。スプレッドシートを正本にし、固定費0円で運用。契約手続きから電子契約を送り、署名完了で自動的に成約 | Google スプレッドシート ＋ Apps Script（API）＋ Cloudflare Pages（画面） | [`packages/zelnora-core`](packages/zelnora-core)（業務ロジック）<br>[`apps/zelnora-gas`](apps/zelnora-gas)（API）<br>[`apps/zelnora-web`](apps/zelnora-web)（画面） |
 
 - 要件からの変更点・仮定：[`docs/DECISIONS.md`](docs/DECISIONS.md)
 - 受け入れ基準と自動テストの対応：[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md)

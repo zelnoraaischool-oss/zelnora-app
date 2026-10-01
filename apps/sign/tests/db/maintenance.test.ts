@@ -68,11 +68,11 @@ describe("定期実行", () => {
     expect(await markExpired(d)).toBeGreaterThanOrEqual(1);
     expect(await anonymizeStale(d)).toBeGreaterThanOrEqual(1);
     const detail = await getContractDetail(d.db, c.contractId);
-    expect(detail.party.name).toBe("（匿名化済み）");
-    expect(detail.party.email).toBeNull();
+    expect(detail.party!.name).toBe("（匿名化済み）");
+    expect(detail.party!.email).toBeNull();
     expect(detail.values.every((v) => v.value === "")).toBe(true);
     expect(detail.contract.title).toContain("匿名化済み");
-    const contact = await pg.query("select name, email from public.contacts where id = $1", [detail.party.contact_id]);
+    const contact = await pg.query("select name, email from public.contacts where id = $1", [detail.party!.contact_id]);
     expect(contact.rows[0]).toEqual({ name: "（匿名化済み）", email: null });
     const chain = await pg.query("select * from public.verify_audit_chain()");
     expect(chain.rows[0].ok).toBe(true);

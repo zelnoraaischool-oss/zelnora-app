@@ -27,6 +27,12 @@ export function testDeps(opts: { tsaDown?: () => boolean } = {}) {
     now: () => new Date(),
     secrets: { session: "test-session-secret", otp: "test-otp-secret", tokenEncryption: "test-token-key" },
     appUrl: "https://sign.test",
+    integration: {
+      apiKey: "test-integration-key",
+      webhookUrl: "https://crm.test/hook",
+      webhookSecret: "test-webhook-secret",
+      fetch: (async () => new Response("{}")) as typeof fetch,
+    },
   };
   return { d, mailer, storageDir };
 }

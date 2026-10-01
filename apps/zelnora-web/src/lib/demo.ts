@@ -3,6 +3,7 @@ import {
   type ApiRequest,
   type ApiResponse,
   addDays,
+  applyEsignStatus,
   addMonthToMonth,
   bootstrapOwner,
   closeMonth,
@@ -10,10 +11,13 @@ import {
   createCtx,
   createLead,
   type Ctx,
+  getDeal,
   getSettings,
+  guessEsignSource,
   handleApi,
   type Handler,
   importWithLog,
+  MemoryEsignGateway,
   MemoryStore,
   monthOf,
   moveStage,
@@ -21,6 +25,8 @@ import {
   productFromTemplate,
   recordPayment,
   recordSession,
+  requireEditable,
+  saveEsignSettings,
   saveForm,
   savePlan,
   saveProduct,
@@ -28,12 +34,49 @@ import {
   systemClock,
   today,
   updateSettings,
+  ZnError,
+  type EsignTemplateInfo,
   type ProgressItem,
   type Revenue,
   type Settings,
 } from "@zelnora/core";
 
 const KEY = "zelnora-demo-v1";
+const ESIGN_KEY = "zelnora-demo-esign-v1";
+
+/** デモの電子契約システム（ブラウザ内の仮のもの） */
+const DEMO_TEMPLATES: EsignTemplateInfo[] = [
+  {
+    id: "demo-tpl-service",
+    name: "サービス利用契約書（デモ）",
+    variables: [
+      { key: "氏名", type: "text", filledBy: "admin", required: true },
+      { key: "プラン名", type: "text", filledBy: "admin", required: true },
+      { key: "料金", type: "money", filledBy: "admin", required: true },
+      { key: "契約日", type: "date", filledBy: "admin", required: true },
+      { key: "住所", type: "address", filledBy: "signer", required: true },
+    ],
+  },
+];
+
+function newGateway(): MemoryEsignGateway {
+  const g = new MemoryEsignGateway(DEMO_TEMPLATES, "https://sign.demo.example");
+  try {
+    const raw = localStorage.getItem(ESIGN_KEY);
+    if (raw) g.restore(JSON.parse(raw) as Parameters<MemoryEsignGateway["restore"]>[0]);
+  } catch {
+    // 読めなければ空から
+  }
+  return g;
+}
+
+function saveGateway(g: MemoryEsignGateway): void {
+  try {
+    localStorage.setItem(ESIGN_KEY, JSON.stringify(g.snapshot()));
+  } catch {
+    // 無視
+  }
+}
 
 class DemoStore extends MemoryStore {
   save() {
@@ -138,14 +181,23 @@ export function seedDemo(store: MemoryStore): void {
   const lastMonth = addMonthToMonth(monthOf(t), -1);
   if (!store.all<Revenue>("revenues").some((r) => r.month === lastMonth)) closeMonth(ctx, owner, lastMonth);
 
+  // 電子契約の連携（デモ用の仮の電子契約システム）：スクール型のプランに契約書を対応付ける
+  const tpl = DEMO_TEMPLATES[0]!;
+  const values = Object.fromEntries(tpl.variables.filter((v) => v.filledBy === "admin").map((v) => [v.key, guessEsignSource(v)]));
+  saveEsignSettings(ctx, owner, {
+    enabled: true,
+    baseUrl: "https://sign.demo.example",
+    plans: Object.fromEntries([planA, planB, planC].map((p) => [p.id, { templateId: tpl.id, templateName: tpl.name, values }])),
+  });
+
   // 法人支援の商談
   createLead(ctx, sales1, { customer: { name: "株式会社サンプル商事", email: "info@sample-shoji.example", company: "株式会社サンプル商事" }, productId: consulting.id, source: "問い合わせ" });
   void getSettings(ctx);
 }
 
-let state: { store: DemoStore; ctx: Ctx } | null = null;
+let state: { store: DemoStore; ctx: Ctx; esign: MemoryEsignGateway } | null = null;
 
-function ensure(): { store: DemoStore; ctx: Ctx } {
+function ensure(): { store: DemoStore; ctx: Ctx; esign: MemoryEsignGateway } {
   if (state) return state;
   let store = load();
   if (!store) {
@@ -153,13 +205,19 @@ function ensure(): { store: DemoStore; ctx: Ctx } {
     seedDemo(store);
     store.save();
   }
-  state = { store, ctx: createCtx(store, { clock: systemClock, notifier: new CollectingNotifier(), prefillUrl: (formId, v) => `https://docs.google.com/forms/d/${formId}/viewform?name=${encodeURIComponent(v.name ?? "")}` }) };
+  const esign = newGateway();
+  state = {
+    store,
+    esign,
+    ctx: createCtx(store, { clock: systemClock, notifier: new CollectingNotifier(), esign, prefillUrl: (formId, v) => `https://docs.google.com/forms/d/${formId}/viewform?name=${encodeURIComponent(v.name ?? "")}` }),
+  };
   return state;
 }
 
 export function resetDemo(): void {
   try {
     localStorage.removeItem(KEY);
+    localStorage.removeItem(ESIGN_KEY);
   } catch {
     // 無視
   }
@@ -188,12 +246,21 @@ const demoHandlers: Record<string, Handler> = {
   "dataSources.test": (_ctx, _user, p) => ({ ok: true, headers: Object.values((p.dataSource?.columns ?? {}) as Record<string, string>), missing: [], message: "（デモ）接続できたものとして扱います" }),
   "forms.installTriggers": () => ({ installed: 0 }),
   "summary.export": () => true,
+  // 顧客が署名したことにする（デモ専用）
+  "demo.esignSign": (ctx, user, p) => {
+    const deal = getDeal(ctx, String(p.id));
+    requireEditable(ctx, user, deal);
+    if (!deal.esign) throw new ZnError("この商談には電子契約がありません", "not_found");
+    const r = applyEsignStatus(ctx, ensure().esign.sign(deal.esign.contractId));
+    return { ...r, deal: getDeal(ctx, deal.id) };
+  },
 };
 
 export async function demoCall(email: string, req: ApiRequest): Promise<ApiResponse> {
-  const { store, ctx } = ensure();
+  const { store, ctx, esign } = ensure();
   const res = handleApi(ctx, email, req, demoHandlers);
   store.save();
+  saveGateway(esign);
   // 画面の反応を実際の通信に近づける
   await new Promise((r) => setTimeout(r, 60));
   return JSON.parse(JSON.stringify(res)) as ApiResponse;

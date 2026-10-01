@@ -6,6 +6,7 @@ import { cx } from "@/components/ui";
 
 const ITEMS = [
   { href: "/admin", label: "契約一覧", exact: true },
+  { href: "/admin/import", label: "既存の契約書を格納" },
   { href: "/admin/templates", label: "テンプレート" },
   { href: "/admin/clauses", label: "条項ライブラリ" },
   { href: "/admin/contacts", label: "連絡先" },

@@ -2,6 +2,7 @@ import { can, type Deal, type Stage, type Target } from "@zelnora/core";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DealDialog, MoveStageDialog } from "../components/deal-dialog";
+import { EsignBadge } from "../components/esign-panel";
 import { OwnerSwitch, ProductPicker } from "../components/pickers";
 import { Alert, Badge, Button, Card, cx, Empty, Field, Input, Loading, Modal, PageHeader, Select, Tabs, yen } from "../components/ui";
 import { call, useApi } from "../lib/api";
@@ -138,6 +139,11 @@ function BoardView({ productId, owner }: { productId: string; owner: string }) {
                   <div className="text-xs text-slate-500">
                     {c.planName || "プラン未定"} {c.deal.amount ? `・${yen(c.deal.amount)}` : ""}
                   </div>
+                  {c.deal.esign && (
+                    <div className="mt-1">
+                      <EsignBadge esign={c.deal.esign} />
+                    </div>
+                  )}
                   {c.deal.nextAction && (
                     <div className={cx("mt-1 text-xs", c.overdue ? "font-bold text-rose-700" : "text-slate-700")}>
                       {c.deal.nextAction.due.slice(5)} {c.deal.nextAction.title}

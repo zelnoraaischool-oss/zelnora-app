@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { DOCX_MAX_BYTES, docxToTemplate } from "@/lib/contract/docx-import";
+import { IMPORT_MAX_BYTES, importExistingContract } from "@/lib/server/archive";
 import { audit } from "@/lib/server/audit";
 import { clientInfo, isDevAuth, requireAdmin } from "@/lib/server/auth";
 import { upsertContact, type ContactInput } from "@/lib/server/contacts";
@@ -53,6 +55,39 @@ export async function createContractAction(input: CreateContractInput) {
     const r = await createContract(deps(), actor, input, client);
     revalidatePath("/admin");
     return r;
+  });
+}
+
+export async function importContractAction(form: FormData) {
+  const actor = await requireAdmin();
+  const client = await clientInfo();
+  return run(async () => {
+    const file = form.get("file");
+    if (!(file instanceof File)) throw new AppError("ファイルを選んでください");
+    if (file.size > IMPORT_MAX_BYTES) throw new AppError(`ファイルが大きすぎます（${IMPORT_MAX_BYTES / 1024 / 1024}MBまで）`);
+    const str = (k: string) => {
+      const v = form.get(k);
+      return typeof v === "string" ? v : "";
+    };
+    const r = await importExistingContract(
+      deps(),
+      actor,
+      {
+        title: str("title"),
+        counterpartyName: str("counterpartyName"),
+        signerName: str("signerName"),
+        signerEmail: str("signerEmail"),
+        signedDate: str("signedDate"),
+        amount: str("amount"),
+        transactionDate: str("transactionDate"),
+        note: str("note"),
+        filename: file.name,
+        bytes: new Uint8Array(await file.arrayBuffer()),
+      },
+      client,
+    );
+    revalidatePath("/admin");
+    return { contractId: r.contract.id, sha256: r.sha256, timestamped: r.timestamped };
   });
 }
 
@@ -118,6 +153,21 @@ export async function createTemplateAction(form: FormData) {
     },
   );
   redirect(`/admin/templates/${t.id}`);
+}
+
+/** Word（.docx）の契約書を本文に変換する（保存はしない。画面で確認してから自動保存される） */
+export async function importDocxAction(form: FormData) {
+  await requireAdmin({ owner: true });
+  return run(async () => {
+    const file = form.get("file");
+    if (!(file instanceof File)) throw new AppError("ファイルを選んでください");
+    if (file.size > DOCX_MAX_BYTES) throw new AppError("ファイルが大きすぎます（4MBまで）");
+    try {
+      return await docxToTemplate(new Uint8Array(await file.arrayBuffer()));
+    } catch (e) {
+      throw new AppError(e instanceof Error && /docx|大きすぎ/.test(e.message) ? e.message : "Wordのファイルを読み込めませんでした。.docx 形式で保存し直してお試しください。");
+    }
+  });
 }
 
 export async function saveDraftAction(templateId: string, input: Partial<DraftInput> & { name?: string; description?: string }) {

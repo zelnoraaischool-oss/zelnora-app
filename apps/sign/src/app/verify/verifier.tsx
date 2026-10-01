@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { formatJst } from "@/lib/format";
 
-type Result = { match: false } | { match: true; signedAt: string; timestampAt: string | null; contractId: string };
+type Result = { match: false } | { match: true; signedAt: string; timestampAt: string | null; contractId: string; kind?: string };
 
 async function sha256OfFile(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
@@ -77,8 +77,18 @@ export function Verifier() {
       {result &&
         (result.match ? (
           <Alert tone="success">
-            <strong>このシステムで締結された契約書と一致します。</strong>
-            {"\n"}締結日時：{formatJst(result.signedAt, { seconds: true })}（日本時間）
+            {result.kind === "original" ? (
+              <>
+                <strong>このシステムに格納された既存の契約書（原本）と一致します。</strong>
+                {"\n"}締結日：{formatJst(result.signedAt).slice(0, 10)}
+                {"\n"}タイムスタンプは、格納した時点でこのファイルが存在したことを示します。
+              </>
+            ) : (
+              <>
+                <strong>このシステムで締結された契約書と一致します。</strong>
+                {"\n"}締結日時：{formatJst(result.signedAt, { seconds: true })}（日本時間）
+              </>
+            )}
             {"\n"}タイムスタンプ時刻：{result.timestampAt ? `${formatJst(result.timestampAt, { seconds: true })}（日本時間）` : "付与待ち"}
             {"\n"}契約ID：{result.contractId}
           </Alert>

@@ -44,7 +44,7 @@ export async function getContact(db: Db, id: string) {
 }
 
 /** メールアドレスで既存の連絡先を探し、あれば更新、なければ作成する */
-export async function upsertContact(db: Db, actor: Actor, input: ContactInput & { id?: string }, client?: ClientInfo) {
+export async function upsertContact(db: Db, actor: Actor | null, input: ContactInput & { id?: string }, client?: ClientInfo) {
   const c = clean(input);
   let existing: ContactRow | null = null;
   if (input.id) existing = await db.one<ContactRow>("select * from public.contacts where id = $1", [input.id]);
@@ -61,8 +61,8 @@ export async function upsertContact(db: Db, actor: Actor, input: ContactInput & 
       [existing.id, c.name, c.email, c.phone, c.company, c.tags, c.note],
     );
     await audit(db, {
-      actorType: "admin",
-      actorId: actor.id,
+      actorType: actor ? "admin" : "system",
+      actorId: actor?.id ?? "integration",
       eventType: "contact.updated",
       payload: { contact_id: existing.id },
       client,
@@ -73,7 +73,7 @@ export async function upsertContact(db: Db, actor: Actor, input: ContactInput & 
     `insert into public.contacts (name, email, phone, company, tags, note) values ($1, $2, $3, $4, $5, $6) returning *`,
     [c.name, c.email, c.phone, c.company, c.tags, c.note],
   );
-  await audit(db, { actorType: "admin", actorId: actor.id, eventType: "contact.created", payload: { contact_id: row!.id }, client });
+  await audit(db, { actorType: actor ? "admin" : "system", actorId: actor?.id ?? "integration", eventType: "contact.created", payload: { contact_id: row!.id }, client });
   return row!;
 }
 

@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/**": ["./node_modules/@expo-google-fonts/noto-sans-jp/400Regular/*.ttf", "./node_modules/@expo-google-fonts/noto-sans-jp/700Bold/*.ttf"],
   },
+  // 既存の契約書（PDF）の格納で、4MBまでのファイルを受け付ける
+  experimental: { serverActions: { bodySizeLimit: "5mb" } },
   serverExternalPackages: ["pg", "subset-font", "harfbuzzjs"],
   async headers() {
     return [
