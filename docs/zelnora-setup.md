@@ -1,6 +1,6 @@
 # Zelnora app：本番のセットアップと運用
 
-固定費0円（Googleアカウント＋スプレッドシート＋Apps Script＋Cloudflare Pages の無料枠）で動かします。
+固定費0円（Googleアカウント＋スプレッドシート＋Apps Script＋Vercel または Cloudflare Pages の無料枠）で動かします。
 
 ## 1. システムアカウント（Apps Script を実行する唯一のアカウント）
 
@@ -22,7 +22,11 @@ npx clasp push
 3. スクリプトプロパティ `APP_URL` に画面のURLを設定する（通知に載せます）。
 4. 「デプロイ → 新しいデプロイ → ウェブアプリ」：実行するユーザー＝**自分**、アクセスできるユーザー＝**全員**。表示されたURLを画面の `VITE_API_URL` に使う。
 
-## 3. Cloudflare Pages（画面）
+## 3. 画面の公開（Vercel または Cloudflare Pages）
+
+**Vercel**：Root Directory を `apps/zelnora-web` にしてインポートするだけです（`vercel.json` 設定済み）。手順は [vercel.md](vercel.md) のA。
+
+**Cloudflare Pages** の場合：
 
 - ビルドコマンド：`pnpm install && pnpm --filter @zelnora/web build`
 - 出力ディレクトリ：`apps/zelnora-web/dist`

@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/server/auth";
+import { missingConfig } from "@/lib/server/config-check";
 import { deps } from "@/lib/server/deps";
 import { getSettings } from "@/lib/server/settings";
 import { logoutAction } from "../login/actions";
@@ -8,6 +10,8 @@ import { AdminNav } from "./nav";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // 初期設定が済んでいなければ、ログイン画面で足りない設定を案内する
+  if (missingConfig().length) redirect("/login");
   const actor = await requireAdmin();
   const settings = await getSettings(deps().db);
   return (

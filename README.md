@@ -9,6 +9,7 @@ AIエンジニアスクールの業務システム一式です。
 
 - 要件からの変更点・仮定：[`docs/DECISIONS.md`](docs/DECISIONS.md)
 - 受け入れ基準と自動テストの対応：[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md)
+- **Vercel につなぐ手順：[`docs/vercel.md`](docs/vercel.md)**
 - 本番のセットアップと運用：[電子契約](docs/sign-setup.md) ／ [Zelnora](docs/zelnora-setup.md)
 
 ## すぐに試す
