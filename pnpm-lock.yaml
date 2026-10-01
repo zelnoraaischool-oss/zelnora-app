@@ -10,9 +10,6 @@ importers:
 
   apps/sign:
     dependencies:
-      '@expo-google-fonts/noto-sans-jp':
-        specifier: ^0.4.3
-        version: 0.4.3
       '@pdf-lib/fontkit':
         specifier: ^1.1.1
         version: 1.1.1
@@ -490,9 +487,6 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
-
-  '@expo-google-fonts/noto-sans-jp@0.4.3':
-    resolution: {integrity: sha512-Fl+Z6vtD24HFAYsvzB0S9Nery1ly16B9PesdY0wBd+wEHAvkNglnkTUspU0HqGOubkmoa8zusJrKv6vDx1o70A==}
 
   '@floating-ui/core@1.8.0':
     resolution: {integrity: sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ==}
@@ -4407,8 +4401,6 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
-
-  '@expo-google-fonts/noto-sans-jp@0.4.3': {}
 
   '@floating-ui/core@1.8.0':
     dependencies:

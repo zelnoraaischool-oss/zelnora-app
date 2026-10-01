@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Zelnora app の画面（Cloudflare Pages に配置するSPA）",
+  "description": "Zelnora app の画面（Vercel または Cloudflare Pages に配置するSPA）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

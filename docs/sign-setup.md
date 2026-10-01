@@ -20,6 +20,8 @@
 
 ## 3. Vercel
 
+画面での手順と環境変数の一覧は [vercel.md](vercel.md) のB にまとめています。
+
 1. リポジトリを接続し、Root Directory を `apps/sign` にする。
 2. 環境変数を設定する（一覧と説明は [`apps/sign/.env.example`](../apps/sign/.env.example)）。`SESSION_SECRET`・`OTP_SECRET`・`TOKEN_ENCRYPTION_KEY`・`CRON_SECRET` は `openssl rand -base64 32` で作成し、**変更しないでください**（変えると発行済みのURLを再コピーできなくなります）。
 3. 独自ドメインを割り当て、`APP_URL` をそのURLにする。

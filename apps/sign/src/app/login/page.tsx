@@ -1,12 +1,16 @@
 import { redirect } from "next/navigation";
 import { Alert } from "@/components/ui";
 import { getAuthState, isDevAuth } from "@/lib/server/auth";
+import { missingConfig } from "@/lib/server/config-check";
+import { SetupRequired } from "../setup-required";
 import { LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "ログイン" };
 
 export default async function LoginPage() {
+  const missing = missingConfig();
+  if (missing.length) return <SetupRequired missing={missing} />;
   const state = await getAuthState();
   if (state.kind === "ok") redirect("/admin");
   if (state.kind === "needs_mfa") redirect("/login/mfa");

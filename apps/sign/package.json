@@ -20,7 +20,6 @@
     "e2e:setup": "./scripts/dev-db.sh sign_e2e >/dev/null && rm -rf .data-e2e && DATABASE_URL=postgres://postgres@127.0.0.1:54329/sign_e2e AUTH_DRIVER=dev pnpm -s bootstrap-owner owner@example.com && DATABASE_URL=postgres://postgres@127.0.0.1:54329/sign_e2e pnpm -s seed"
   },
   "dependencies": {
-    "@expo-google-fonts/noto-sans-jp": "^0.4.3",
     "@pdf-lib/fontkit": "^1.1.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",

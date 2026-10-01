@@ -4,7 +4,8 @@ import { addMonths, endDateFor } from "../src/dates";
 import { findDuplicateGroups, matchCustomer } from "../src/dedupe";
 import { planProgress } from "../src/progress";
 import { computeTax, priceAt, revenueSchedule } from "../src/revenue";
-import type { Customer, ProgressTemplate } from "../src/types";
+import { mapAnswers } from "../src/registration";
+import type { Customer, FormMapping, ProgressTemplate } from "../src/types";
 import { maskPhone, normalizeEmail, normalizePhone } from "../src/util";
 
 describe("日付", () => {
@@ -93,5 +94,16 @@ describe("重複の検出", () => {
   });
   it("電話番号を伏せる", () => {
     expect(maskPhone("090-1234-5678")).toBe("090-****-5678");
+  });
+});
+
+describe("フォームの対応付け", () => {
+  it("姓と名・セイとメイが別の質問なら、氏名とふりがなにまとめる", () => {
+    const form = {
+      mapping: { a: "customer.lastName", b: "customer.firstName", c: "customer.lastKana", d: "customer.firstKana", e: "customer.email", f: "customer.custom.birthday" },
+    } as unknown as FormMapping;
+    const r = mapAnswers(form, { a: "河村", b: "悦郎", c: "カワムラ", d: "エツロウ", e: "x@example.com", f: "1974/03/13" });
+    expect(r.customer).toEqual({ name: "河村 悦郎", kana: "カワムラ エツロウ", email: "x@example.com" });
+    expect(r.custom).toEqual({ birthday: "1974/03/13" });
   });
 });
